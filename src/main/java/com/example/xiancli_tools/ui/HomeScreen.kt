@@ -29,11 +29,13 @@ import com.example.xiancli_tools.R
 import com.example.xiancli_tools.ui.components.IconBadge
 
 private val TimerAccent = Color(0xFF4C6FFF)
+private val TrackAccent = Color(0xFF00897B)
 private val StatsAccent = Color(0xFF34A853)
 
 @Composable
 fun HomeScreen(
     onOpenTimer: () -> Unit,
+    onOpenTrack: () -> Unit,
     onOpenPhoneStats: () -> Unit
 ) {
     Scaffold { padding ->
@@ -59,6 +61,14 @@ fun HomeScreen(
                 icon = R.drawable.ic_tool_timer,
                 accent = TimerAccent,
                 onClick = onOpenTimer
+            )
+            Spacer(Modifier.height(12.dp))
+            ToolCard(
+                title = "轨迹记录",
+                subtitle = "步行 · 骑车 · 开车，日月周年统计与轨迹地图",
+                icon = R.drawable.ic_tool_route,
+                accent = TrackAccent,
+                onClick = onOpenTrack
             )
             Spacer(Modifier.height(12.dp))
             ToolCard(
