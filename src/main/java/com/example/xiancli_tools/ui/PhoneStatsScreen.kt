@@ -68,8 +68,14 @@ private val categoryColors = listOf(
     Color(0xFF9E9E9E)
 )
 
+private val undefinedColor = Color(0xFF9E9E9E)
+
 private fun colorFor(category: AppCategory): Color =
-    categoryColors[category.ordinal % categoryColors.size]
+    if (category == AppCategory.UNDEFINED) {
+        undefinedColor
+    } else {
+        categoryColors[category.ordinal % categoryColors.size]
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,7 +127,7 @@ fun PhoneStatsScreen(onBack: () -> Unit) {
             ) {
                 Spacer(Modifier.height(4.dp))
                 OverviewGrid(current)
-                CategorySection(current.categories, current.totalApps)
+                CategorySection(current.categories, current.launchableApps)
                 StorageSection(current)
                 MemorySection(current)
             }
@@ -232,7 +238,7 @@ private fun CategorySection(categories: List<CategoryCount>, totalApps: Int) {
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "个应用",
+                            text = "个可启动应用",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
