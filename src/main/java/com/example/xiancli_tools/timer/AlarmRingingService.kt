@@ -6,6 +6,9 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.media.Ringtone
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
@@ -18,6 +21,7 @@ import com.example.xiancli_tools.data.SettingsRepository
 class AlarmRingingService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
+    private var ringtone: Ringtone? = null
     private var vibrator: Vibrator? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -30,9 +34,10 @@ class AlarmRingingService : Service() {
         }
 
         val label = intent?.getStringExtra(TimerScheduler.EXTRA_LABEL) ?: "定时"
+        val preview = intent?.getBooleanExtra(EXTRA_PREVIEW, false) ?: false
         NotificationHelper.ensureChannels(this)
         startForegroundCompat(NotificationHelper.buildRingingNotification(this, label))
-        startRinging()
+        startRinging(preview)
         return START_NOT_STICKY
     }
 
@@ -45,27 +50,32 @@ class AlarmRingingService : Service() {
         }
     }
 
-    private fun startRinging() {
+    private fun startRinging(preview: Boolean) {
         val settings = SettingsRepository(this)
 
         RingtoneResolver.resolveUri(this, settings)?.let { uri ->
-            runCatching {
-                mediaPlayer = MediaPlayer().apply {
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    setDataSource(this@AlarmRingingService, uri)
-                    isLooping = true
-                    prepare()
-                    start()
-                }
-            }.onFailure { Log.e(TAG, "播放铃声失败", it) }
+            val attributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            val player = MediaPlayer()
+            val started = runCatching {
+                player.setAudioAttributes(attributes)
+                player.setDataSource(this@AlarmRingingService, uri)
+                player.isLooping = true
+                player.prepare()
+                player.start()
+            }.isSuccess
+            if (started) {
+                mediaPlayer = player
+            } else {
+                player.release()
+                Log.w(TAG, "MediaPlayer 无法播放 $uri，改用 Ringtone")
+                playViaRingtone(uri, attributes)
+            }
         }
 
-        if (settings.vibrationEnabled) {
+        if (settings.vibrationEnabled && !preview) {
             val device = obtainVibrator()
             vibrator = device
             val pattern = longArrayOf(0L, 800L, 600L)
@@ -80,6 +90,18 @@ class AlarmRingingService : Service() {
         }
     }
 
+    private fun playViaRingtone(uri: Uri, attributes: AudioAttributes) {
+        runCatching {
+            ringtone = RingtoneManager.getRingtone(this, uri)?.apply {
+                setAudioAttributes(attributes)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    isLooping = true
+                }
+                play()
+            }
+        }.onFailure { Log.e(TAG, "播放铃声失败", it) }
+    }
+
     private fun obtainVibrator(): Vibrator =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             getSystemService(VibratorManager::class.java).defaultVibrator
@@ -92,6 +114,8 @@ class AlarmRingingService : Service() {
         runCatching { mediaPlayer?.stop() }
         mediaPlayer?.release()
         mediaPlayer = null
+        runCatching { ringtone?.stop() }
+        ringtone = null
         vibrator?.cancel()
         vibrator = null
     }
@@ -104,5 +128,6 @@ class AlarmRingingService : Service() {
     companion object {
         private const val TAG = "AlarmRingingService"
         const val ACTION_STOP = "com.example.xiancli_tools.action.STOP_ALARM"
+        const val EXTRA_PREVIEW = "extra_preview"
     }
 }

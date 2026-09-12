@@ -55,7 +55,7 @@ fun HomeScreen(
             Spacer(Modifier.height(12.dp))
             ToolCard(
                 title = "定时器",
-                subtitle = "5 分钟 · 10 分钟 · 30 分钟 · 1 小时 · 自定义",
+                subtitle = "10 分钟 · 25 分钟 · 50 分钟 · 自定义",
                 icon = R.drawable.ic_tool_timer,
                 accent = TimerAccent,
                 onClick = onOpenTimer

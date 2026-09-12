@@ -74,10 +74,9 @@ private data class TimerOption(
 )
 
 private val timerOptions = listOf(
-    TimerOption("5 分钟", 5, "泡面 · 小憩", Color(0xFF34A853)),
     TimerOption("10 分钟", 10, "冥想 · 放松", Color(0xFF2196F3)),
-    TimerOption("30 分钟", 30, "高效专注", Color(0xFFF59E0B)),
-    TimerOption("1 小时", 60, "深度工作", Color(0xFF8B5CF6)),
+    TimerOption("25 分钟", 25, "番茄专注", Color(0xFFF59E0B)),
+    TimerOption("50 分钟", 50, "深度工作", Color(0xFF8B5CF6)),
     TimerOption("自定义", 0, "自由设置", Color(0xFF00ACC1), R.drawable.ic_add, custom = true)
 )
 

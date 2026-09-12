@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,7 +56,6 @@ import com.example.xiancli_tools.data.SettingsRepository
 import com.example.xiancli_tools.timer.AlarmRingingService
 import com.example.xiancli_tools.timer.TimerScheduler
 import com.example.xiancli_tools.ui.components.IconBadge
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,6 +70,14 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
     var ringtoneTitle by remember {
         mutableStateOf(RingtoneResolver.resolveTitle(context, repository))
     }
+    var previewing by remember { mutableStateOf(false) }
+    val ringtoneServiceIntent = remember {
+        Intent(context, AlarmRingingService::class.java)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { context.stopService(ringtoneServiceIntent) }
+    }
 
     val ringtonePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -82,8 +90,9 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     Uri::class.java
                 )
             }
-            repository.ringtoneUri = picked
-            repository.ringtoneTitle = picked?.let { RingtoneResolver.titleOf(context, it) }
+            val custom = picked?.takeIf { RingtoneResolver.isCustomRingtone(it) }
+            repository.ringtoneUri = custom
+            repository.ringtoneTitle = custom?.let { RingtoneResolver.titleOf(context, it) }
             ringtoneTitle = RingtoneResolver.resolveTitle(context, repository)
             scope.launch { snackbarHostState.showSnackbar("铃声已更新") }
         }
@@ -145,23 +154,28 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
 
             Button(
                 onClick = {
-                    val intent = Intent(context, AlarmRingingService::class.java)
-                        .putExtra(TimerScheduler.EXTRA_LABEL, "试听")
-                    ContextCompat.startForegroundService(context, intent)
-                    scope.launch {
-                        delay(4000)
-                        context.stopService(Intent(context, AlarmRingingService::class.java))
+                    if (previewing) {
+                        context.stopService(ringtoneServiceIntent)
+                        previewing = false
+                    } else {
+                        val intent = Intent(ringtoneServiceIntent)
+                            .putExtra(TimerScheduler.EXTRA_LABEL, "试听")
+                            .putExtra(AlarmRingingService.EXTRA_PREVIEW, true)
+                        ContextCompat.startForegroundService(context, intent)
+                        previewing = true
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_ringtone),
+                    painter = painterResource(
+                        if (previewing) R.drawable.ic_stop else R.drawable.ic_ringtone
+                    ),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("试听当前提醒")
+                Text(if (previewing) "停止试听" else "试听当前提醒")
             }
 
             Spacer(Modifier.height(12.dp))
