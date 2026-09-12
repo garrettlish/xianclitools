@@ -29,6 +29,7 @@ import com.example.xiancli_tools.R
 import com.example.xiancli_tools.ui.components.IconBadge
 
 private val TimerAccent = Color(0xFF4C6FFF)
+private val NoteAccent = Color(0xFF7C4DFF)
 private val LedgerAccent = Color(0xFFF59E0B)
 private val TrackAccent = Color(0xFF00897B)
 private val StatsAccent = Color(0xFF34A853)
@@ -36,6 +37,7 @@ private val StatsAccent = Color(0xFF34A853)
 @Composable
 fun HomeScreen(
     onOpenTimer: () -> Unit,
+    onOpenNote: () -> Unit,
     onOpenLedger: () -> Unit,
     onOpenTrack: () -> Unit,
     onOpenPhoneStats: () -> Unit
@@ -63,6 +65,14 @@ fun HomeScreen(
                 icon = R.drawable.ic_tool_timer,
                 accent = TimerAccent,
                 onClick = onOpenTimer
+            )
+            Spacer(Modifier.height(12.dp))
+            ToolCard(
+                title = "记事本",
+                subtitle = "随手记录灵感、待办与备忘",
+                icon = R.drawable.ic_tool_note,
+                accent = NoteAccent,
+                onClick = onOpenNote
             )
             Spacer(Modifier.height(12.dp))
             ToolCard(
