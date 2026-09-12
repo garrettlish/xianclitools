@@ -19,6 +19,7 @@ import com.example.xiancli_tools.data.TrackSession
 private sealed interface Screen {
     data object Home : Screen
     data object Timer : Screen
+    data object Ledger : Screen
     data object Track : Screen
     data class TrackMap(val sessions: List<TrackSession>) : Screen
     data object PhoneStats : Screen
@@ -56,12 +57,16 @@ fun AppRoot() {
     when (val current = screen) {
         Screen.Home -> HomeScreen(
             onOpenTimer = { screen = Screen.Timer },
+            onOpenLedger = { screen = Screen.Ledger },
             onOpenTrack = { screen = Screen.Track },
             onOpenPhoneStats = { screen = Screen.PhoneStats }
         )
         Screen.Timer -> TimerScreen(
             onBack = { screen = Screen.Home },
             onOpenSettings = { screen = Screen.NotificationSettings }
+        )
+        Screen.Ledger -> LedgerScreen(
+            onBack = { screen = Screen.Home }
         )
         Screen.Track -> TrackScreen(
             onBack = { screen = Screen.Home },
