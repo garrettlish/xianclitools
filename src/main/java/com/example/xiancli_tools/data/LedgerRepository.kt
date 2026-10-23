@@ -3,7 +3,6 @@ package com.example.xiancli_tools.data
 import android.content.Context
 import android.util.Log
 import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 
 class LedgerRepository(context: Context) {
@@ -15,12 +14,7 @@ class LedgerRepository(context: Context) {
     fun loadRecords(): List<ExpenseRecord> {
         if (!recordsFile.exists()) return emptyList()
         return runCatching {
-            val array = JSONArray(recordsFile.readText())
-            buildList {
-                for (index in 0 until array.length()) {
-                    add(parseRecord(array.getJSONObject(index)))
-                }
-            }
+            JsonCodec.recordsFromJson(JSONArray(recordsFile.readText()))
         }.onFailure { Log.e(TAG, "读取记账记录失败", it) }.getOrDefault(emptyList())
     }
 
@@ -37,10 +31,14 @@ class LedgerRepository(context: Context) {
         write(loadRecords().filterNot { it.id == id })
     }
 
+    /** 用给定列表整体替换本地记账记录（导入备份时使用）。 */
+    @Synchronized
+    fun replaceAll(records: List<ExpenseRecord>) {
+        write(records.sortedByDescending { it.timeMillis })
+    }
+
     private fun write(records: List<ExpenseRecord>) {
-        val array = JSONArray()
-        records.forEach { array.put(it.toJson()) }
-        writeAtomically(array.toString())
+        writeAtomically(JsonCodec.recordsToJson(records).toString())
     }
 
     private fun writeAtomically(content: String) {
@@ -50,26 +48,6 @@ class LedgerRepository(context: Context) {
             if (recordsFile.exists()) recordsFile.delete()
             temp.renameTo(recordsFile)
         }.onFailure { Log.e(TAG, "写入记账记录失败", it) }
-    }
-
-    private fun ExpenseRecord.toJson(): JSONObject = JSONObject()
-        .put("id", id)
-        .put("category", category.name)
-        .put("amount", amountCents)
-        .put("note", note)
-        .put("time", timeMillis)
-
-    private fun parseRecord(json: JSONObject): ExpenseRecord {
-        val category = runCatching {
-            ExpenseCategory.valueOf(json.optString("category", ExpenseCategory.OTHER.name))
-        }.getOrDefault(ExpenseCategory.OTHER)
-        return ExpenseRecord(
-            id = json.optLong("id"),
-            category = category,
-            amountCents = json.optLong("amount"),
-            note = json.optString("note"),
-            timeMillis = json.optLong("time")
-        )
     }
 
     private companion object {

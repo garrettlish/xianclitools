@@ -1,4 +1,4 @@
-# xiancli 工具集（xiancli-tools）
+# 方寸（xiancli-tools）
 
 一个图文并茂的 Android 工具集 App。首页展示工具列表，目前包含「定时器」「记账本」「轨迹记录」「手机统计」四个工具：
 
@@ -7,6 +7,7 @@
 - **记账本**：按类型（餐饮、交通、酒店、门票、购物、娱乐、医疗、其他）快速记账；按自然日 / 周 / 月 / 年生成报告，含汇总、支出趋势柱状图、分类占比环形图与账目明细。
 - **轨迹记录**：步行 / 骑车 / 开车轨迹记录，日月周年统计与轨迹地图。
 - **手机统计**：图表展示应用数量（总数 / 第三方 / 系统 / 可启动）、应用分类分布（环形图）、内部存储与运行内存占用。
+- **数据备份**：一键把记事、记账、轨迹导出成单个 JSON 文件；一键导入（可选「合并」或「覆盖」）。
 - **通知设置**：震动开关 + 铃声选择（系统铃声、通知音及手机中的音乐），并支持「试听当前提醒」。
 - **默认行为**：震动 + 系统默认铃声。
 
@@ -196,11 +197,39 @@ ADB=~/Library/Android/sdk/platform-tools/adb
 
 ---
 
-## 六、功能测试要点
+## 六、数据备份（导出 / 导入）
+
+首页点「数据备份」进入，页面顶部显示当前记事 / 记账 / 轨迹的条数。
+
+- **一键导出全部数据**：弹出系统文件选择器（默认文件名 `方寸备份-yyyyMMdd-HHmm.json`，默认存到「下载」），把三类数据写进同一个 JSON。走 SAF，不需要任何存储权限，也不会上传。
+- **一键导入数据**：选中一个备份文件后弹出确认框，两种方式：
+  - **合并导入**：保留现有数据，只补充文件里 id 不存在的新记录（同一次导入里重复 id 只保留第一条），并提示「新增 N 条，跳过 M 条」。
+  - **覆盖导入**：先清空现有三类数据，再写入文件内容。
+
+备份文件格式（`schema` 为版本号，导入时会校验，非本 App 的 JSON 或更高版本会被拒绝并提示）：
+
+```json
+{
+  "app": "fangcun",
+  "schema": 1,
+  "exportedAt": 1792750728208,
+  "counts": { "notes": 1, "ledger": 1, "tracks": 0 },
+  "notes":  [ { "id": 1792750651589, "category": "REMINDER", "content": "…", "time": 1792750637539 } ],
+  "ledger": [ { "id": 1792750682256, "category": "FOOD", "amount": 3550, "note": "", "time": 1792750667818 } ],
+  "tracks": [ { "id": 1, "mode": "BIKE", "start": 0, "end": 0, "distance": 1234.5, "points": [[31.23, 121.47, 0]] } ]
+}
+```
+
+> `amount` 单位是分；轨迹 `points` 每项是 `[纬度, 经度, 毫秒时间戳]`。
+> 本地存储文件与备份文件共用 `data/JsonCodec.kt` 里的同一套字段，避免两边格式漂移。
+
+---
+
+## 七、功能测试要点
 
 | 功能 | 测试方法 |
 | --- | --- |
-| 首页 | 打开 App，看到工具卡片「定时器」「记账本」「轨迹记录」「手机统计」，点击进入对应页面 |
+| 首页 | 打开 App，看到工具卡片「定时器」「记事本」「记账本」「轨迹记录」「手机统计」「数据备份」，点击进入对应页面 |
 | 快速记账 | 记账本页填写金额、选择类型（可加备注、改时间），点「保存」后可在明细中看到 |
 | 记账报告 | 切换「日 / 周 / 月 / 年」，查看汇总、支出趋势柱状图、分类占比环形图与账目明细 |
 | 设置定时 | 点任一时长卡片，底部出现 Snackbar，页面上方出现倒计时卡片 |
@@ -212,13 +241,16 @@ ADB=~/Library/Android/sdk/platform-tools/adb
 | 手机统计 | 首页点「手机统计」，查看应用数量卡片、分类环形图、存储与内存条形图 |
 | 通知权限 | 首次启动会申请「通知」权限，务必允许，否则到点可能看不到通知 |
 | 精确闹钟 | 若定时页顶部出现黄色提示条，点「去开启」允许精确闹钟，定时更准时 |
+| 导出备份 | 数据备份 → 一键导出全部数据 → 在系统选择器里保存，检查「下载」里生成了 `方寸备份-*.json` |
+| 导入备份 | 先 `adb shell pm clear com.example.xiancli_tools` 清空数据，再导入该文件选「覆盖导入」，三个条数应恢复 |
+| 导入容错 | 选一个别的 JSON（如其他 App 的导出文件）导入，应提示「导入失败：不是「方寸」的备份文件」且本地数据不变 |
 
 > App 需要的权限：通知（POST_NOTIFICATIONS）、震动（VIBRATE）、精确闹钟（USE_EXACT_ALARM / SCHEDULE_EXACT_ALARM）、前台服务（FOREGROUND_SERVICE + SPECIAL_USE）、应用列表（QUERY_ALL_PACKAGES，用于统计已安装应用）。
 > `QUERY_ALL_PACKAGES` 属于敏感权限，若上架 Google Play 需说明用途；仅自用/内部分发无影响。
 
 ---
 
-## 七、常见问题
+## 八、常见问题
 
 **Q：`./gradlew` 报找不到 Java？**
 先执行第三节的 `export JAVA_HOME=...`。也可在 Android Studio 中 **Settings → Build → Build Tools → Gradle → Gradle JDK** 选择内置 JBR。
@@ -240,7 +272,7 @@ ADB=~/Library/Android/sdk/platform-tools/adb
 
 ---
 
-## 八、项目结构
+## 九、项目结构
 
 ```text
 xianclitools/                         # 根目录即应用模块（单模块扁平结构）
@@ -260,6 +292,9 @@ xianclitools/                         # 根目录即应用模块（单模块扁�
     │   │   │   ├── RingtoneResolver.kt       # 铃声 URI / 名称解析
     │   │   │   ├── LedgerModels.kt           # 记账类型 / 记录 / 周期统计
     │   │   │   ├── LedgerRepository.kt       # 记账记录持久化（JSON）
+    │   │   │   ├── JsonCodec.kt              # 记事/记账/轨迹的统一 JSON 编解码
+    │   │   │   ├── BackupCodec.kt            # 备份文件格式（schema 校验）与合并规则
+    │   │   │   ├── BackupRepository.kt       # 备份导出/导入（SAF Uri 读写）
     │   │   │   └── PhoneStatsRepository.kt   # 应用数量/分类/存储/内存采集
     │   │   ├── timer/
     │   │   │   ├── NotificationHelper.kt   # 通知渠道与响铃通知
@@ -273,6 +308,7 @@ xianclitools/                         # 根目录即应用模块（单模块扁�
     │   │       ├── LedgerScreen.kt         # 记账本页（快速记账 + 日月周年图表报告）
     │   │       ├── LedgerStyle.kt          # 支出类型图标与配色
     │   │       ├── PhoneStatsScreen.kt     # 手机统计页（图表）
+    │   │       ├── BackupScreen.kt         # 数据备份页（导出/导入 + 合并/覆盖确认）
     │   │       ├── SettingsScreen.kt       # 通知设置页
     │   │       ├── components/
     │   │       │   ├── IconBadge.kt        # 圆形图标徽章
@@ -286,7 +322,7 @@ xianclitools/                         # 根目录即应用模块（单模块扁�
 
 ---
 
-## 九、技术栈
+## 十、技术栈
 
 - Kotlin + Jetpack Compose（Material 3）
 - `AlarmManager` 精确定时 + `BroadcastReceiver`

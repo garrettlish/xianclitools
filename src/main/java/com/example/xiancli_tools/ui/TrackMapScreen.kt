@@ -92,19 +92,32 @@ fun TrackMapScreen(
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1720)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFE8EAED)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(360.dp)
             ) {
-                TrackMap(
-                    tracks = tracks,
-                    colorOf = { it.accent },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(20.dp))
-                )
+                if (tracks.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "没有可显示的轨迹点",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    TrackMap(
+                        tracks = tracks,
+                        colorOf = { it.accent },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(20.dp))
+                    )
+                }
             }
             Spacer(Modifier.height(8.dp))
             Text(

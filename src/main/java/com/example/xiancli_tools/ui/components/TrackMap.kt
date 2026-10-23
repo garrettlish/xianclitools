@@ -1,212 +1,253 @@
 package com.example.xiancli_tools.ui.components
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Box
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.BitmapDrawable
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.findViewTreeLifecycleOwner
+import com.example.xiancli_tools.data.GeoTransform
 import com.example.xiancli_tools.data.TrackPoint
 import com.example.xiancli_tools.data.TransportMode
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.min
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.MapTileIndex
+import org.osmdroid.views.CustomZoomButtonsController
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.CopyrightOverlay
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.views.overlay.ScaleBarOverlay
+import java.io.File
+import java.util.Locale
+import android.graphics.Color as AndroidColor
 
 data class MapTrack(
     val mode: TransportMode,
     val points: List<TrackPoint>
 )
 
-private const val METERS_PER_DEGREE = 111_320.0
+private val START_COLOR = AndroidColor.rgb(0x34, 0xA8, 0x53)
+private val END_COLOR = AndroidColor.rgb(0xEA, 0x43, 0x35)
 
-private data class Projection(
-    val centerLat: Double,
-    val centerLng: Double,
-    val metersPerDegreeLng: Double,
-    val pixelsPerMeter: Double
-)
+private const val MIN_ZOOM = 3.0
+private const val MAX_ZOOM = 18.0
+private const val FIT_PADDING_DP = 28f
+private const val MARKER_SIZE_DP = 18f
+private const val LINE_WIDTH_DP = 5f
 
+/**
+ * 轨迹地图：高德标准底图 + WGS-84 转 GCJ-02 后的轨迹线。
+ *
+ * 手机定位记录的是 WGS-84，国内底图是 GCJ-02，转换在 [TrackPoint.toGeoPoint] 中完成，
+ * 否则轨迹会整体偏离实际道路几百米。
+ */
 @Composable
 fun TrackMap(
     tracks: List<MapTrack>,
     colorOf: (TransportMode) -> Color,
-    modifier: Modifier = Modifier,
-    backgroundColor: Color = Color(0xFF0F1720),
-    gridColor: Color = Color(0x1AFFFFFF)
+    modifier: Modifier = Modifier
 ) {
-    val allPoints = remember(tracks) { tracks.flatMap { it.points } }
-    if (allPoints.isEmpty()) {
-        Box(modifier)
-        return
-    }
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val lifecycleOwner = LocalView.current.findViewTreeLifecycleOwner()
+    val mapView = remember(context) { createTrackMapView(context) }
 
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
-    val textMeasurer = rememberTextMeasurer()
-
-    Canvas(
-        modifier = modifier.pointerInput(tracks) {
-            detectTransformGestures { _, pan, zoom, _ ->
-                scale = (scale * zoom).coerceIn(1f, 24f)
-                offset += pan
+    DisposableEffect(lifecycleOwner, mapView) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                else -> Unit
             }
         }
-    ) {
-        drawRect(backgroundColor)
-        val projection = computeProjection(allPoints, size)
-        val project: (TrackPoint) -> Offset = { point -> projectPoint(point, projection, size) }
+        lifecycleOwner?.lifecycle?.addObserver(observer)
+        onDispose {
+            lifecycleOwner?.lifecycle?.removeObserver(observer)
+            mapView.onPause()
+            mapView.onDetach()
+        }
+    }
 
-        withTransform({
-            translate(offset.x, offset.y)
-            scale(scale, scale, pivot = Offset(size.width / 2f, size.height / 2f))
-        }) {
-            drawGrid(gridColor)
-            tracks.forEach { track ->
-                if (track.points.size < 2) return@forEach
-                val path = Path()
-                track.points.forEachIndexed { index, point ->
-                    val projected = project(point)
-                    if (index == 0) path.moveTo(projected.x, projected.y)
-                    else path.lineTo(projected.x, projected.y)
+    val lineWidthPx = with(density) { LINE_WIDTH_DP.dp.toPx() }
+    val markerSizePx = with(density) { MARKER_SIZE_DP.dp.toPx() }
+    val fitPaddingPx = with(density) { FIT_PADDING_DP.dp.roundToPx() }
+
+    LaunchedEffect(mapView, tracks) {
+        val drawn = mapView.renderTracks(tracks, colorOf, lineWidthPx, markerSizePx)
+        if (drawn.isNotEmpty()) {
+            // 等 MapView 完成测量后再按轨迹范围缩放，否则拿到的宽高是 0。
+            mapView.post { mapView.fitToPoints(drawn, fitPaddingPx) }
+        }
+    }
+
+    AndroidView(factory = { mapView }, modifier = modifier)
+}
+
+private fun createTrackMapView(context: Context): MapView {
+    configureOsmdroid(context)
+    return MapView(context).apply {
+        setTileSource(AmapTileSource)
+        setMultiTouchControls(true)
+        setUseDataConnection(true)
+        setMinZoomLevel(MIN_ZOOM)
+        setMaxZoomLevel(MAX_ZOOM)
+        controller.setZoom(16.0)
+        zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
+        overlays.add(
+            ScaleBarOverlay(this).apply {
+                setAlignBottom(true)
+                setAlignRight(false)
+                setUnitsOfMeasure(ScaleBarOverlay.UnitsOfMeasure.metric)
+            }
+        )
+        overlays.add(
+            CopyrightOverlay(context).apply {
+                setCopyrightNotice("© 高德地图")
+                setAlignBottom(true)
+                setAlignRight(true)
+                setTextColor(AndroidColor.rgb(0x5F, 0x63, 0x68))
+            }
+        )
+    }
+}
+
+private var osmdroidConfigured = false
+
+/** osmdroid 默认把缓存写到外部存储，Android 10 之后会因无权限导致瓦片下载失败，这里改到应用私有目录。 */
+private fun configureOsmdroid(context: Context) {
+    if (osmdroidConfigured) return
+    val config = Configuration.getInstance()
+    config.load(context, context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
+    config.setUserAgentValue(context.packageName)
+    val basePath = File(context.filesDir, "osmdroid").apply { mkdirs() }
+    val tileCache = File(context.cacheDir, "osmdroid/tiles").apply { mkdirs() }
+    config.setOsmdroidBasePath(basePath)
+    config.setOsmdroidTileCache(tileCache)
+    osmdroidConfigured = true
+}
+
+/**
+ * 高德标准底图（style=8 带中文标注）。瓦片本身是 GCJ-02，所以轨迹点必须先转换。
+ */
+private object AmapTileSource : OnlineTileSourceBase(
+    "AmapStandard",
+    MIN_ZOOM.toInt(),
+    MAX_ZOOM.toInt(),
+    256,
+    ".png",
+    arrayOf("https://wprd01.is.autonavi.com/appmaptile")
+) {
+    private const val URL_TEMPLATE =
+        "https://wprd0%d.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scl=1&style=8&x=%d&y=%d&z=%d"
+
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        val zoom = MapTileIndex.getZoom(pMapTileIndex)
+        val x = MapTileIndex.getX(pMapTileIndex)
+        val y = MapTileIndex.getY(pMapTileIndex)
+        // 四个子域轮询，避免单域名并发过高
+        val host = 1 + ((x + y) % 4)
+        return String.format(Locale.US, URL_TEMPLATE, host, x, y, zoom)
+    }
+}
+
+private fun MapView.renderTracks(
+    tracks: List<MapTrack>,
+    colorOf: (TransportMode) -> Color,
+    lineWidthPx: Float,
+    markerSizePx: Float
+): List<GeoPoint> {
+    overlays.removeAll { it is Polyline || it is Marker }
+
+    val allPoints = ArrayList<GeoPoint>()
+    val startIcon = ringIcon(START_COLOR, markerSizePx)
+    val endIcon = ringIcon(END_COLOR, markerSizePx)
+
+    tracks.forEach { track ->
+        val points = track.points.map { it.toGeoPoint() }
+        if (points.isEmpty()) return@forEach
+        allPoints += points
+
+        if (points.size >= 2) {
+            overlays.add(
+                Polyline(this).apply {
+                    setPoints(points)
+                    setGeodesic(false)
+                    setInfoWindow(null)
+                    outlinePaint.color = colorOf(track.mode).toArgb()
+                    outlinePaint.strokeWidth = lineWidthPx
+                    outlinePaint.strokeCap = Paint.Cap.ROUND
+                    outlinePaint.strokeJoin = Paint.Join.ROUND
                 }
-                drawPath(
-                    path = path,
-                    color = colorOf(track.mode),
-                    style = Stroke(
-                        width = 5.dp.toPx() / scale,
-                        cap = StrokeCap.Round,
-                        join = StrokeJoin.Round
-                    )
-                )
-            }
-            tracks.forEach { track ->
-                val first = track.points.firstOrNull() ?: return@forEach
-                val last = track.points.lastOrNull() ?: return@forEach
-                drawCircle(
-                    color = Color(0xFF34A853),
-                    radius = 6.dp.toPx() / scale,
-                    center = project(first),
-                    style = Stroke(width = 3.dp.toPx() / scale)
-                )
-                drawCircle(
-                    color = Color(0xFFEA4335),
-                    radius = 6.dp.toPx() / scale,
-                    center = project(last),
-                    style = Stroke(width = 3.dp.toPx() / scale)
-                )
-            }
+            )
         }
+        overlays.add(buildMarker(points.first(), startIcon))
+        overlays.add(buildMarker(points.last(), endIcon))
+    }
 
-        drawScaleBar(
-            textMeasurer = textMeasurer,
-            metersPerPixel = 1.0 / projection.pixelsPerMeter / scale
-        )
+    invalidate()
+    return allPoints
+}
+
+private fun MapView.buildMarker(point: GeoPoint, icon: BitmapDrawable): Marker =
+    Marker(this).apply {
+        setPosition(point)
+        setIcon(icon)
+        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+        setInfoWindow(null)
+    }
+
+/** 白底 + 彩色圆环，在花色底图上也能一眼看到起点终点。 */
+private fun MapView.ringIcon(color: Int, sizePx: Float): BitmapDrawable {
+    val size = sizePx.toInt().coerceAtLeast(8)
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val strokeWidth = size * 0.26f
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val canvas = Canvas(bitmap)
+    val center = size / 2f
+
+    paint.style = Paint.Style.FILL
+    paint.color = AndroidColor.WHITE
+    canvas.drawCircle(center, center, center, paint)
+
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = strokeWidth
+    paint.color = color
+    canvas.drawCircle(center, center, center - strokeWidth / 2f, paint)
+
+    return BitmapDrawable(resources, bitmap).apply {
+        bitmap.density = resources.displayMetrics.densityDpi
     }
 }
 
-private fun computeProjection(points: List<TrackPoint>, size: Size): Projection {
-    var minLat = Double.MAX_VALUE
-    var maxLat = -Double.MAX_VALUE
-    var minLng = Double.MAX_VALUE
-    var maxLng = -Double.MAX_VALUE
-    points.forEach { point ->
-        minLat = min(minLat, point.latitude)
-        maxLat = max(maxLat, point.latitude)
-        minLng = min(minLng, point.longitude)
-        maxLng = max(maxLng, point.longitude)
-    }
-    val centerLat = (minLat + maxLat) / 2.0
-    val centerLng = (minLng + maxLng) / 2.0
-    val metersPerDegreeLng = METERS_PER_DEGREE * cos(centerLat * PI / 180.0)
-    val spanX = max((maxLng - minLng) * metersPerDegreeLng, 1.0)
-    val spanY = max((maxLat - minLat) * METERS_PER_DEGREE, 1.0)
-    val padding = 0.12f * min(size.width, size.height)
-    val usableWidth = (size.width - 2 * padding).coerceAtLeast(1f)
-    val usableHeight = (size.height - 2 * padding).coerceAtLeast(1f)
-    val pixelsPerMeter = min(usableWidth / spanX, usableHeight / spanY)
-    return Projection(centerLat, centerLng, metersPerDegreeLng, pixelsPerMeter)
-}
-
-private fun projectPoint(point: TrackPoint, projection: Projection, size: Size): Offset {
-    val metersX = (point.longitude - projection.centerLng) * projection.metersPerDegreeLng
-    val metersY = (point.latitude - projection.centerLat) * METERS_PER_DEGREE
-    return Offset(
-        x = size.width / 2f + (metersX * projection.pixelsPerMeter).toFloat(),
-        y = size.height / 2f - (metersY * projection.pixelsPerMeter).toFloat()
-    )
-}
-
-private fun DrawScope.drawGrid(color: Color) {
-    val step = 64f
-    var x = 0f
-    while (x <= size.width) {
-        drawLine(color, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
-        x += step
-    }
-    var y = 0f
-    while (y <= size.height) {
-        drawLine(color, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
-        y += step
+private fun MapView.fitToPoints(points: List<GeoPoint>, paddingPx: Int) {
+    if (points.isEmpty()) return
+    val box = BoundingBox.fromGeoPoints(points)
+    if (box.latitudeSpan < 1e-6 && box.longitudeSpanWithDateLine < 1e-6) {
+        controller.setZoom(17.0)
+        controller.setCenter(points.first())
+    } else {
+        zoomToBoundingBox(box, false, paddingPx)
     }
 }
 
-private fun DrawScope.drawScaleBar(textMeasurer: TextMeasurer, metersPerPixel: Double) {
-    val candidates = doubleArrayOf(20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0)
-    val targetPx = 90.0 * density
-    val meters = candidates.firstOrNull { it / metersPerPixel >= targetPx } ?: candidates.last()
-    val lengthPx = (meters / metersPerPixel).toFloat().coerceAtMost(size.width * 0.6f)
-
-    val left = 16.dp.toPx()
-    val bottom = size.height - 24.dp.toPx()
-    val label = if (meters >= 1000) "${(meters / 1000).toInt()} km" else "${meters.toInt()} m"
-    val textStyle = TextStyle(
-        color = Color.White,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Medium
-    )
-    val textLayout = textMeasurer.measure(label, textStyle)
-
-    drawLine(
-        color = Color.White,
-        start = Offset(left, bottom),
-        end = Offset(left + lengthPx, bottom),
-        strokeWidth = 3.dp.toPx(),
-        cap = StrokeCap.Round
-    )
-    listOf(left, left + lengthPx).forEach { tickX ->
-        drawLine(
-            color = Color.White,
-            start = Offset(tickX, bottom - 5.dp.toPx()),
-            end = Offset(tickX, bottom + 5.dp.toPx()),
-            strokeWidth = 2.dp.toPx()
-        )
-    }
-    drawText(
-        textMeasurer = textMeasurer,
-        text = label,
-        topLeft = Offset(left, bottom - textLayout.size.height - 6.dp.toPx()),
-        style = textStyle
-    )
+private fun TrackPoint.toGeoPoint(): GeoPoint {
+    val (latitude, longitude) = GeoTransform.wgs84ToGcj02(this.latitude, this.longitude)
+    return GeoPoint(latitude, longitude)
 }

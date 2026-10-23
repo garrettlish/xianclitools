@@ -33,6 +33,7 @@ private val NoteAccent = Color(0xFF7C4DFF)
 private val LedgerAccent = Color(0xFFF59E0B)
 private val TrackAccent = Color(0xFF00897B)
 private val StatsAccent = Color(0xFF34A853)
+private val BackupAccent = Color(0xFF546E7A)
 
 @Composable
 fun HomeScreen(
@@ -40,7 +41,8 @@ fun HomeScreen(
     onOpenNote: () -> Unit,
     onOpenLedger: () -> Unit,
     onOpenTrack: () -> Unit,
-    onOpenPhoneStats: () -> Unit
+    onOpenPhoneStats: () -> Unit,
+    onOpenBackup: () -> Unit
 ) {
     Scaffold { padding ->
         Column(
@@ -97,6 +99,14 @@ fun HomeScreen(
                 icon = R.drawable.ic_pie_chart,
                 accent = StatsAccent,
                 onClick = onOpenPhoneStats
+            )
+            Spacer(Modifier.height(12.dp))
+            ToolCard(
+                title = "数据备份",
+                subtitle = "一键导出 / 导入记事、记账与轨迹数据",
+                icon = R.drawable.ic_backup,
+                accent = BackupAccent,
+                onClick = onOpenBackup
             )
         }
     }

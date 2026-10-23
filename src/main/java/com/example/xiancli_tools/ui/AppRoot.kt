@@ -24,6 +24,7 @@ private sealed interface Screen {
     data object Track : Screen
     data class TrackMap(val sessions: List<TrackSession>) : Screen
     data object PhoneStats : Screen
+    data object Backup : Screen
     data object NotificationSettings : Screen
 }
 
@@ -61,7 +62,8 @@ fun AppRoot() {
             onOpenNote = { screen = Screen.Note },
             onOpenLedger = { screen = Screen.Ledger },
             onOpenTrack = { screen = Screen.Track },
-            onOpenPhoneStats = { screen = Screen.PhoneStats }
+            onOpenPhoneStats = { screen = Screen.PhoneStats },
+            onOpenBackup = { screen = Screen.Backup }
         )
         Screen.Timer -> TimerScreen(
             onBack = { screen = Screen.Home },
@@ -82,6 +84,9 @@ fun AppRoot() {
             onBack = { screen = Screen.Track }
         )
         Screen.PhoneStats -> PhoneStatsScreen(
+            onBack = { screen = Screen.Home }
+        )
+        Screen.Backup -> BackupScreen(
             onBack = { screen = Screen.Home }
         )
         Screen.NotificationSettings -> NotificationSettingsScreen(

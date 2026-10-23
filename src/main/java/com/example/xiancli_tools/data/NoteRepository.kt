@@ -3,7 +3,6 @@ package com.example.xiancli_tools.data
 import android.content.Context
 import android.util.Log
 import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 
 class NoteRepository(context: Context) {
@@ -15,12 +14,8 @@ class NoteRepository(context: Context) {
     fun loadNotes(): List<Note> {
         if (!notesFile.exists()) return emptyList()
         return runCatching {
-            val array = JSONArray(notesFile.readText())
-            buildList {
-                for (index in 0 until array.length()) {
-                    add(parseNote(array.getJSONObject(index)))
-                }
-            }.sortedByDescending { it.timeMillis }
+            JsonCodec.notesFromJson(JSONArray(notesFile.readText()))
+                .sortedByDescending { it.timeMillis }
         }.onFailure { Log.e(TAG, "读取笔记失败", it) }.getOrDefault(emptyList())
     }
 
@@ -37,10 +32,14 @@ class NoteRepository(context: Context) {
         write(loadNotes().filterNot { it.id == id })
     }
 
+    /** 用给定列表整体替换本地笔记（导入备份时使用）。 */
+    @Synchronized
+    fun replaceAll(notes: List<Note>) {
+        write(notes.sortedByDescending { it.timeMillis })
+    }
+
     private fun write(notes: List<Note>) {
-        val array = JSONArray()
-        notes.forEach { array.put(it.toJson()) }
-        writeAtomically(array.toString())
+        writeAtomically(JsonCodec.notesToJson(notes).toString())
     }
 
     private fun writeAtomically(content: String) {
@@ -50,24 +49,6 @@ class NoteRepository(context: Context) {
             if (notesFile.exists()) notesFile.delete()
             temp.renameTo(notesFile)
         }.onFailure { Log.e(TAG, "写入笔记失败", it) }
-    }
-
-    private fun Note.toJson(): JSONObject = JSONObject()
-        .put("id", id)
-        .put("category", category.name)
-        .put("content", content)
-        .put("time", timeMillis)
-
-    private fun parseNote(json: JSONObject): Note {
-        val category = runCatching {
-            NoteCategory.valueOf(json.optString("category", NoteCategory.OTHER.name))
-        }.getOrDefault(NoteCategory.OTHER)
-        return Note(
-            id = json.optLong("id"),
-            category = category,
-            content = json.optString("content"),
-            timeMillis = json.optLong("time")
-        )
     }
 
     private companion object {
