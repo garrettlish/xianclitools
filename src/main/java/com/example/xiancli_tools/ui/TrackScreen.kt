@@ -66,6 +66,7 @@ import com.example.xiancli_tools.track.RecorderSnapshot
 import com.example.xiancli_tools.track.TrackRecorderService
 import com.example.xiancli_tools.track.TrackRecorderState
 import com.example.xiancli_tools.ui.components.ChartSlice
+import com.example.xiancli_tools.ui.components.ConfirmDeleteDialog
 import com.example.xiancli_tools.ui.components.CustomRangeBar
 import com.example.xiancli_tools.ui.components.DonutChart
 import com.example.xiancli_tools.ui.components.IconBadge
@@ -101,6 +102,7 @@ fun TrackScreen(
     var customRange by remember { mutableStateOf(DateRanges.lastDays()) }
     var elapsed by remember { mutableLongStateOf(0L) }
     var pendingMode by remember { mutableStateOf<TransportMode?>(null) }
+    var pendingDelete by remember { mutableStateOf<TrackSession?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -152,6 +154,14 @@ fun TrackScreen(
 
     val summary = remember(sessions, period, customRange) {
         TrackAnalytics.summarize(sessions, period, customRange = customRange)
+    }
+
+    fun delete(session: TrackSession) {
+        scope.launch {
+            withContext(Dispatchers.IO) { repository.deleteSession(session.id) }
+            sessions = withContext(Dispatchers.IO) { repository.loadSessions() }
+            snackbarHostState.showSnackbar("已删除")
+        }
     }
 
     fun pickRangeStart() {
@@ -283,9 +293,23 @@ fun TrackScreen(
             SummaryContent(
                 summary = summary,
                 period = period,
-                onOpenMap = onOpenMap
+                onOpenMap = onOpenMap,
+                onDelete = { pendingDelete = it }
             )
         }
+    }
+
+    pendingDelete?.let { session ->
+        val label = "${session.mode.label} ${formatSessionTime(session.startMillis, period)}"
+        ConfirmDeleteDialog(
+            title = "删除轨迹",
+            message = "确定删除 $label 的轨迹吗？删除后无法恢复。",
+            onConfirm = {
+                delete(session)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null }
+        )
     }
 }
 
@@ -484,7 +508,8 @@ private fun RecordingMetric(
 private fun SummaryContent(
     summary: com.example.xiancli_tools.data.PeriodSummary,
     period: TrackPeriod,
-    onOpenMap: (List<TrackSession>) -> Unit
+    onOpenMap: (List<TrackSession>) -> Unit,
+    onDelete: (TrackSession) -> Unit
 ) {
     if (summary.sessions.isEmpty()) {
         Card(
@@ -522,7 +547,7 @@ private fun SummaryContent(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TotalsCard(summary)
         ModeBreakdownCard(summary)
-        SessionListCard(summary, onOpenMap)
+        SessionListCard(summary, onOpenMap, onDelete)
     }
 }
 
@@ -674,7 +699,8 @@ private fun ModeBreakdownCard(summary: com.example.xiancli_tools.data.PeriodSumm
 @Composable
 private fun SessionListCard(
     summary: com.example.xiancli_tools.data.PeriodSummary,
-    onOpenMap: (List<TrackSession>) -> Unit
+    onOpenMap: (List<TrackSession>) -> Unit,
+    onDelete: (TrackSession) -> Unit
 ) {
     SectionCard(title = "轨迹明细") {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -682,7 +708,8 @@ private fun SessionListCard(
                 SessionRow(
                     session = session,
                     period = summary.period,
-                    onClick = { onOpenMap(listOf(session)) }
+                    onClick = { onOpenMap(listOf(session)) },
+                    onDelete = { onDelete(session) }
                 )
             }
         }
@@ -706,7 +733,8 @@ private fun SessionListCard(
 private fun SessionRow(
     session: TrackSession,
     period: TrackPeriod,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -741,6 +769,14 @@ private fun SessionRow(
             contentDescription = "查看轨迹",
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        IconButton(onClick = onDelete) {
+            Icon(
+                painter = painterResource(R.drawable.ic_delete),
+                contentDescription = "删除",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }
 

@@ -65,6 +65,7 @@ import com.example.xiancli_tools.data.TrendBucket
 import com.example.xiancli_tools.ui.components.BarChart
 import com.example.xiancli_tools.ui.components.BarDatum
 import com.example.xiancli_tools.ui.components.ChartSlice
+import com.example.xiancli_tools.ui.components.ConfirmDeleteDialog
 import com.example.xiancli_tools.ui.components.CustomRangeBar
 import com.example.xiancli_tools.ui.components.DonutChart
 import com.example.xiancli_tools.ui.components.IconBadge
@@ -96,6 +97,7 @@ fun LedgerScreen(onBack: () -> Unit) {
     var selectedCategory by remember { mutableStateOf(ExpenseCategory.FOOD) }
     var note by remember { mutableStateOf("") }
     var entryTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var pendingDelete by remember { mutableStateOf<ExpenseRecord?>(null) }
 
     LaunchedEffect(Unit) {
         records = withContext(Dispatchers.IO) { repository.loadRecords() }
@@ -247,9 +249,24 @@ fun LedgerScreen(onBack: () -> Unit) {
             ReportContent(
                 summary = summary,
                 trend = trend,
-                onDelete = { delete(it) }
+                onDelete = { pendingDelete = it }
             )
         }
+    }
+
+    pendingDelete?.let { record ->
+        val label = record.category.label +
+            if (record.note.isNotEmpty()) " · ${record.note.take(20)}" else ""
+        val amount = LedgerAnalytics.formatYuan(record.amountCents)
+        ConfirmDeleteDialog(
+            title = "删除账目",
+            message = "确定删除「$label $amount」吗？删除后无法恢复。",
+            onConfirm = {
+                delete(record)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null }
+        )
     }
 }
 

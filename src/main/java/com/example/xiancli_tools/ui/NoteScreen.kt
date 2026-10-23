@@ -63,6 +63,7 @@ import com.example.xiancli_tools.data.NoteTrendBucket
 import com.example.xiancli_tools.ui.components.BarChart
 import com.example.xiancli_tools.ui.components.BarDatum
 import com.example.xiancli_tools.ui.components.ChartSlice
+import com.example.xiancli_tools.ui.components.ConfirmDeleteDialog
 import com.example.xiancli_tools.ui.components.CustomRangeBar
 import com.example.xiancli_tools.ui.components.DonutChart
 import com.example.xiancli_tools.ui.components.IconBadge
@@ -94,6 +95,7 @@ fun NoteScreen(onBack: () -> Unit) {
     var content by remember { mutableStateOf("") }
     var entryTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var editingId by remember { mutableStateOf<Long?>(null) }
+    var pendingDelete by remember { mutableStateOf<Note?>(null) }
 
     LaunchedEffect(Unit) {
         notes = withContext(Dispatchers.IO) { repository.loadNotes() }
@@ -257,9 +259,22 @@ fun NoteScreen(onBack: () -> Unit) {
                     content = note.content
                     entryTime = note.timeMillis
                 },
-                onDelete = { delete(it) }
+                onDelete = { pendingDelete = it }
             )
         }
+    }
+
+    pendingDelete?.let { note ->
+        val preview = note.content.take(40) + if (note.content.length > 40) "…" else ""
+        ConfirmDeleteDialog(
+            title = "删除备忘",
+            message = "确定删除这条备忘吗？删除后无法恢复。\n\n$preview",
+            onConfirm = {
+                delete(note)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null }
+        )
     }
 }
 
