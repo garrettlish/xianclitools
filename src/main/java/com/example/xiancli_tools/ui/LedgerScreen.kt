@@ -53,6 +53,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
+import com.example.xiancli_tools.data.DateRange
+import com.example.xiancli_tools.data.DateRanges
 import com.example.xiancli_tools.data.ExpenseCategory
 import com.example.xiancli_tools.data.ExpenseRecord
 import com.example.xiancli_tools.data.LedgerAnalytics
@@ -63,8 +65,11 @@ import com.example.xiancli_tools.data.TrendBucket
 import com.example.xiancli_tools.ui.components.BarChart
 import com.example.xiancli_tools.ui.components.BarDatum
 import com.example.xiancli_tools.ui.components.ChartSlice
+import com.example.xiancli_tools.ui.components.CustomRangeBar
 import com.example.xiancli_tools.ui.components.DonutChart
 import com.example.xiancli_tools.ui.components.IconBadge
+import com.example.xiancli_tools.ui.components.PeriodTabs
+import com.example.xiancli_tools.ui.components.showDatePicker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -86,6 +91,7 @@ fun LedgerScreen(onBack: () -> Unit) {
 
     var records by remember { mutableStateOf<List<ExpenseRecord>>(emptyList()) }
     var period by remember { mutableStateOf(LedgerPeriod.DAY) }
+    var customRange by remember { mutableStateOf(DateRanges.lastDays()) }
     var amountInput by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(ExpenseCategory.FOOD) }
     var note by remember { mutableStateOf("") }
@@ -95,7 +101,9 @@ fun LedgerScreen(onBack: () -> Unit) {
         records = withContext(Dispatchers.IO) { repository.loadRecords() }
     }
 
-    val summary = remember(records, period) { LedgerAnalytics.summarize(records, period) }
+    val summary = remember(records, period, customRange) {
+        LedgerAnalytics.summarize(records, period, customRange = customRange)
+    }
     val trend = remember(summary) { LedgerAnalytics.trend(summary) }
 
     fun save() {
@@ -156,10 +164,22 @@ fun LedgerScreen(onBack: () -> Unit) {
         ).show()
     }
 
+    fun pickRangeStart() {
+        showDatePicker(context, customRange.startMillis) { picked ->
+            customRange = DateRanges.ofDays(picked, maxOf(picked, customRange.lastDayMillis))
+        }
+    }
+
+    fun pickRangeEnd() {
+        showDatePicker(context, customRange.lastDayMillis) { picked ->
+            customRange = DateRanges.ofDays(minOf(picked, customRange.startMillis), picked)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("记账本", fontWeight = FontWeight.Bold) },
+                title = { Text("账本", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -203,7 +223,26 @@ fun LedgerScreen(onBack: () -> Unit) {
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(12.dp))
-            PeriodSelector(selected = period, onSelect = { period = it })
+            PeriodTabs(
+                labels = LedgerPeriod.entries.map { it.label },
+                selectedIndex = period.ordinal,
+                onSelect = { period = LedgerPeriod.entries[it] }
+            )
+            if (period == LedgerPeriod.CUSTOM) {
+                Spacer(Modifier.height(8.dp))
+                CustomRangeBar(
+                    range = customRange,
+                    accent = LedgerAccent,
+                    onPickStart = { pickRangeStart() },
+                    onPickEnd = { pickRangeEnd() }
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "共 ${customRange.dayCount} 天",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Spacer(Modifier.height(12.dp))
             ReportContent(
                 summary = summary,
@@ -355,46 +394,6 @@ private fun CategoryChip(
 }
 
 @Composable
-private fun PeriodSelector(
-    selected: LedgerPeriod,
-    onSelect: (LedgerPeriod) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(14.dp)
-            )
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        LedgerPeriod.entries.forEach { option ->
-            val active = option == selected
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        if (active) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        RoundedCornerShape(10.dp)
-                    )
-                    .clickable { onSelect(option) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = option.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (active) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun ReportContent(
     summary: LedgerSummary,
     trend: List<TrendBucket>,
@@ -424,7 +423,7 @@ private fun ReportContent(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "本${summary.period.label}还没有记账记录",
+                    text = "${summary.rangeName}还没有记账记录",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -443,7 +442,7 @@ private fun ReportContent(
 
 @Composable
 private fun TotalsCard(summary: LedgerSummary) {
-    SectionCard(title = "本${summary.period.label}汇总") {
+    SectionCard(title = "${summary.rangeName}汇总") {
         Text(
             text = LedgerAnalytics.formatDateHeading(summary),
             style = MaterialTheme.typography.bodySmall,
@@ -746,6 +745,7 @@ private fun formatRecordTime(millis: Long, period: LedgerPeriod): String {
         LedgerPeriod.WEEK -> "E HH:mm"
         LedgerPeriod.MONTH -> "MM-dd HH:mm"
         LedgerPeriod.YEAR -> "MM-dd HH:mm"
+        LedgerPeriod.CUSTOM -> "MM-dd HH:mm"
     }
     return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(millis))
 }

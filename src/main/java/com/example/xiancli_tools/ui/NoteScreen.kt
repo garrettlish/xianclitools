@@ -52,6 +52,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
+import com.example.xiancli_tools.data.DateRanges
 import com.example.xiancli_tools.data.Note
 import com.example.xiancli_tools.data.NoteAnalytics
 import com.example.xiancli_tools.data.NoteCategory
@@ -62,8 +63,11 @@ import com.example.xiancli_tools.data.NoteTrendBucket
 import com.example.xiancli_tools.ui.components.BarChart
 import com.example.xiancli_tools.ui.components.BarDatum
 import com.example.xiancli_tools.ui.components.ChartSlice
+import com.example.xiancli_tools.ui.components.CustomRangeBar
 import com.example.xiancli_tools.ui.components.DonutChart
 import com.example.xiancli_tools.ui.components.IconBadge
+import com.example.xiancli_tools.ui.components.PeriodTabs
+import com.example.xiancli_tools.ui.components.showDatePicker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -85,6 +89,7 @@ fun NoteScreen(onBack: () -> Unit) {
 
     var notes by remember { mutableStateOf<List<Note>>(emptyList()) }
     var period by remember { mutableStateOf(NotePeriod.DAY) }
+    var customRange by remember { mutableStateOf(DateRanges.lastDays()) }
     var selectedCategory by remember { mutableStateOf(NoteCategory.REMINDER) }
     var content by remember { mutableStateOf("") }
     var entryTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -94,7 +99,9 @@ fun NoteScreen(onBack: () -> Unit) {
         notes = withContext(Dispatchers.IO) { repository.loadNotes() }
     }
 
-    val summary = remember(notes, period) { NoteAnalytics.summarize(notes, period) }
+    val summary = remember(notes, period, customRange) {
+        NoteAnalytics.summarize(notes, period, customRange = customRange)
+    }
     val trend = remember(summary) { NoteAnalytics.trend(summary) }
 
     fun resetEditor() {
@@ -161,10 +168,22 @@ fun NoteScreen(onBack: () -> Unit) {
         ).show()
     }
 
+    fun pickRangeStart() {
+        showDatePicker(context, customRange.startMillis) { picked ->
+            customRange = DateRanges.ofDays(picked, maxOf(picked, customRange.lastDayMillis))
+        }
+    }
+
+    fun pickRangeEnd() {
+        showDatePicker(context, customRange.lastDayMillis) { picked ->
+            customRange = DateRanges.ofDays(minOf(picked, customRange.startMillis), picked)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("记事本", fontWeight = FontWeight.Bold) },
+                title = { Text("备忘", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -208,7 +227,26 @@ fun NoteScreen(onBack: () -> Unit) {
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(12.dp))
-            PeriodSelector(selected = period, onSelect = { period = it })
+            PeriodTabs(
+                labels = NotePeriod.entries.map { it.label },
+                selectedIndex = period.ordinal,
+                onSelect = { period = NotePeriod.entries[it] }
+            )
+            if (period == NotePeriod.CUSTOM) {
+                Spacer(Modifier.height(8.dp))
+                CustomRangeBar(
+                    range = customRange,
+                    accent = NoteAccent,
+                    onPickStart = { pickRangeStart() },
+                    onPickEnd = { pickRangeEnd() }
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "共 ${customRange.dayCount} 天",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Spacer(Modifier.height(12.dp))
             ReportContent(
                 summary = summary,
@@ -361,46 +399,6 @@ private fun CategoryChip(
 }
 
 @Composable
-private fun PeriodSelector(
-    selected: NotePeriod,
-    onSelect: (NotePeriod) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(14.dp)
-            )
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        NotePeriod.entries.forEach { option ->
-            val active = option == selected
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        if (active) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        RoundedCornerShape(10.dp)
-                    )
-                    .clickable { onSelect(option) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = option.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (active) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun ReportContent(
     summary: NoteSummary,
     trend: List<NoteTrendBucket>,
@@ -431,7 +429,7 @@ private fun ReportContent(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "本${summary.period.label}还没有记事",
+                    text = "${summary.rangeName}还没有记事",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -454,7 +452,7 @@ private fun TotalsCard(summary: NoteSummary) {
         .map { dayKey(it.timeMillis) }
         .distinct()
         .size
-    SectionCard(title = "本${summary.period.label}汇总") {
+    SectionCard(title = "${summary.rangeName}汇总") {
         Text(
             text = NoteAnalytics.formatDateHeading(summary),
             style = MaterialTheme.typography.bodySmall,
@@ -513,9 +511,9 @@ private fun TrendCard(
         val peak = trend.maxByOrNull { it.count }
         Text(
             text = if (peak == null || peak.count == 0) {
-                "本${summary.period.label}还没有记录"
+                "${summary.rangeName}还没有记录"
             } else {
-                "单${summary.period.label}最高 ${peak.count} 条"
+                "${summary.peakLabel} ${peak.count} 条"
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -636,7 +634,7 @@ private fun NotesCard(
     onEdit: (Note) -> Unit,
     onDelete: (Note) -> Unit
 ) {
-    SectionCard(title = "记事明细") {
+    SectionCard(title = "记录明细") {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             summary.notes.forEach { note ->
                 NoteRow(
@@ -766,6 +764,7 @@ private fun formatRecordTime(millis: Long, period: NotePeriod): String {
         NotePeriod.WEEK -> "E HH:mm"
         NotePeriod.MONTH -> "MM-dd HH:mm"
         NotePeriod.YEAR -> "MM-dd HH:mm"
+        NotePeriod.CUSTOM -> "MM-dd HH:mm"
     }
     return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(millis))
 }

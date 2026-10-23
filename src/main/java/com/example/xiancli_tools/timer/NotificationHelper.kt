@@ -24,7 +24,7 @@ object NotificationHelper {
             "定时提醒",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "定时器结束时的提醒"
+            description = "计时结束时的提醒"
             setSound(null, null)
             enableVibration(false)
         }

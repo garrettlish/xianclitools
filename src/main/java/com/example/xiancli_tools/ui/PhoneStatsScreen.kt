@@ -90,7 +90,7 @@ fun PhoneStatsScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("手机统计", fontWeight = FontWeight.Bold) },
+                title = { Text("本机", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(

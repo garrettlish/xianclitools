@@ -133,7 +133,7 @@ fun TimerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("定时器", fontWeight = FontWeight.Bold) },
+                title = { Text("计时", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(

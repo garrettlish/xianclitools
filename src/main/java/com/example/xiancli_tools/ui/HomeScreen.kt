@@ -95,40 +95,40 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(12.dp))
             ToolCard(
-                title = "定时器",
-                subtitle = "10 分钟 · 25 分钟 · 50 分钟 · 自定义",
+                title = "计时",
+                subtitle = "10 / 25 / 50 分钟，也可自定义",
                 icon = R.drawable.ic_tool_timer,
                 accent = TimerAccent,
                 onClick = onOpenTimer
             )
             Spacer(Modifier.height(12.dp))
             ToolCard(
-                title = "记事本",
-                subtitle = "随手记录灵感、待办与备忘",
+                title = "备忘",
+                subtitle = "随手记下待办、灵感与心情",
                 icon = R.drawable.ic_tool_note,
                 accent = NoteAccent,
                 onClick = onOpenNote
             )
             Spacer(Modifier.height(12.dp))
             ToolCard(
-                title = "记账本",
-                subtitle = "按类型快速记账，日月周年支出图表报告",
+                title = "账本",
+                subtitle = "快速记账，区间支出报告",
                 icon = R.drawable.ic_tool_ledger,
                 accent = LedgerAccent,
                 onClick = onOpenLedger
             )
             Spacer(Modifier.height(12.dp))
             ToolCard(
-                title = "轨迹记录",
-                subtitle = "步行 · 骑车 · 开车，日月周年统计与轨迹地图",
+                title = "足迹",
+                subtitle = "步行 · 骑车 · 开车轨迹地图",
                 icon = R.drawable.ic_tool_route,
                 accent = TrackAccent,
                 onClick = onOpenTrack
             )
             Spacer(Modifier.height(12.dp))
             ToolCard(
-                title = "手机统计",
-                subtitle = "应用数量 · 分类 · 存储与内存占用",
+                title = "本机",
+                subtitle = "应用 · 分类 · 存储与内存",
                 icon = R.drawable.ic_pie_chart,
                 accent = StatsAccent,
                 onClick = onOpenPhoneStats

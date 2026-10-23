@@ -1,6 +1,5 @@
 package com.example.xiancli_tools.data
 
-import java.util.Calendar
 import java.util.Locale
 import kotlin.math.asin
 import kotlin.math.cos
@@ -41,7 +40,8 @@ enum class TrackPeriod(val label: String) {
     DAY("日"),
     WEEK("周"),
     MONTH("月"),
-    YEAR("年")
+    YEAR("年"),
+    CUSTOM("自定义")
 }
 
 data class ModeSummary(
@@ -57,6 +57,13 @@ data class PeriodSummary(
     val endMillis: Long,
     val sessions: List<TrackSession>
 ) {
+    val range: DateRange
+        get() = DateRange(startMillis, endMillis)
+
+    /** 报表标题用词：本日 / 本周 / 本月 / 本年 / 所选区间。 */
+    val rangeName: String
+        get() = if (period == TrackPeriod.CUSTOM) "所选区间" else "本${period.label}"
+
     val totalDistanceMeters: Double
         get() = sessions.sumOf { it.distanceMeters }
 
@@ -92,49 +99,30 @@ object TrackAnalytics {
     fun summarize(
         sessions: List<TrackSession>,
         period: TrackPeriod,
-        now: Long = System.currentTimeMillis()
+        now: Long = System.currentTimeMillis(),
+        customRange: DateRange? = null
     ): PeriodSummary {
-        val start = startOfPeriod(period, now)
-        val end = startOfNextPeriod(period, start)
+        val range = rangeOf(period, now, customRange)
         val inRange = sessions
-            .filter { it.startMillis in start until end }
+            .filter { it.startMillis in range.startMillis until range.endMillis }
             .sortedByDescending { it.startMillis }
-        return PeriodSummary(period, start, end, inRange)
+        return PeriodSummary(period, range.startMillis, range.endMillis, inRange)
     }
 
-    fun startOfPeriod(period: TrackPeriod, now: Long): Long {
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = now
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        when (period) {
-            TrackPeriod.DAY -> Unit
-            TrackPeriod.WEEK -> {
-                val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
-                val daysFromMonday = (dayOfWeek + 5) % 7
-                calendar.add(Calendar.DAY_OF_MONTH, -daysFromMonday)
-            }
-            TrackPeriod.MONTH -> calendar.set(Calendar.DAY_OF_MONTH, 1)
-            TrackPeriod.YEAR -> calendar.set(Calendar.DAY_OF_YEAR, 1)
-        }
-        return calendar.timeInMillis
+    /** 把「日 / 周 / 月 / 年 / 自定义」统一折算成具体区间。 */
+    fun rangeOf(
+        period: TrackPeriod,
+        now: Long,
+        customRange: DateRange? = null
+    ): DateRange = when (period) {
+        TrackPeriod.DAY -> DateRanges.day(now)
+        TrackPeriod.WEEK -> DateRanges.week(now)
+        TrackPeriod.MONTH -> DateRanges.month(now)
+        TrackPeriod.YEAR -> DateRanges.year(now)
+        TrackPeriod.CUSTOM -> customRange ?: DateRanges.lastDays(now)
     }
 
-    private fun startOfNextPeriod(period: TrackPeriod, startMillis: Long): Long {
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = startMillis
-        }
-        when (period) {
-            TrackPeriod.DAY -> calendar.add(Calendar.DAY_OF_MONTH, 1)
-            TrackPeriod.WEEK -> calendar.add(Calendar.DAY_OF_MONTH, 7)
-            TrackPeriod.MONTH -> calendar.add(Calendar.MONTH, 1)
-            TrackPeriod.YEAR -> calendar.add(Calendar.YEAR, 1)
-        }
-        return calendar.timeInMillis
-    }
+    fun startOfPeriod(period: TrackPeriod, now: Long): Long = rangeOf(period, now).startMillis
 
     fun formatDistance(meters: Double): String = when {
         meters <= 0 -> "0 米"

@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.xiancli_tools.R
+import com.example.xiancli_tools.data.DateRanges
 import com.example.xiancli_tools.data.TrackAnalytics
 import com.example.xiancli_tools.data.TrackPeriod
 import com.example.xiancli_tools.data.TrackRepository
@@ -65,8 +66,11 @@ import com.example.xiancli_tools.track.RecorderSnapshot
 import com.example.xiancli_tools.track.TrackRecorderService
 import com.example.xiancli_tools.track.TrackRecorderState
 import com.example.xiancli_tools.ui.components.ChartSlice
+import com.example.xiancli_tools.ui.components.CustomRangeBar
 import com.example.xiancli_tools.ui.components.DonutChart
 import com.example.xiancli_tools.ui.components.IconBadge
+import com.example.xiancli_tools.ui.components.PeriodTabs
+import com.example.xiancli_tools.ui.components.showDatePicker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -94,6 +98,7 @@ fun TrackScreen(
     var sessions by remember { mutableStateOf<List<TrackSession>>(emptyList()) }
     var selectedMode by remember { mutableStateOf(TransportMode.WALK) }
     var period by remember { mutableStateOf(TrackPeriod.DAY) }
+    var customRange by remember { mutableStateOf(DateRanges.lastDays()) }
     var elapsed by remember { mutableLongStateOf(0L) }
     var pendingMode by remember { mutableStateOf<TransportMode?>(null) }
 
@@ -145,14 +150,26 @@ fun TrackScreen(
         }
     }
 
-    val summary = remember(sessions, period) {
-        TrackAnalytics.summarize(sessions, period)
+    val summary = remember(sessions, period, customRange) {
+        TrackAnalytics.summarize(sessions, period, customRange = customRange)
+    }
+
+    fun pickRangeStart() {
+        showDatePicker(context, customRange.startMillis) { picked ->
+            customRange = DateRanges.ofDays(picked, maxOf(picked, customRange.lastDayMillis))
+        }
+    }
+
+    fun pickRangeEnd() {
+        showDatePicker(context, customRange.lastDayMillis) { picked ->
+            customRange = DateRanges.ofDays(minOf(picked, customRange.startMillis), picked)
+        }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("轨迹记录", fontWeight = FontWeight.Bold) },
+                title = { Text("足迹", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -242,7 +259,26 @@ fun TrackScreen(
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(12.dp))
-            PeriodSelector(selected = period, onSelect = { period = it })
+            PeriodTabs(
+                labels = TrackPeriod.entries.map { it.label },
+                selectedIndex = period.ordinal,
+                onSelect = { period = TrackPeriod.entries[it] }
+            )
+            if (period == TrackPeriod.CUSTOM) {
+                Spacer(Modifier.height(8.dp))
+                CustomRangeBar(
+                    range = customRange,
+                    accent = TrackAccent,
+                    onPickStart = { pickRangeStart() },
+                    onPickEnd = { pickRangeEnd() }
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "共 ${customRange.dayCount} 天",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Spacer(Modifier.height(12.dp))
             SummaryContent(
                 summary = summary,
@@ -445,47 +481,6 @@ private fun RecordingMetric(
 }
 
 @Composable
-private fun PeriodSelector(
-    selected: TrackPeriod,
-    onSelect: (TrackPeriod) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(14.dp)
-            )
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        TrackPeriod.entries.forEach { option ->
-            val active = option == selected
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        if (active) MaterialTheme.colorScheme.surface
-                        else Color.Transparent,
-                        RoundedCornerShape(10.dp)
-                    )
-                    .clickable { onSelect(option) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = option.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (active) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun SummaryContent(
     summary: com.example.xiancli_tools.data.PeriodSummary,
     period: TrackPeriod,
@@ -515,7 +510,7 @@ private fun SummaryContent(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "本${period.label}还没有轨迹记录",
+                    text = "${summary.rangeName}还没有轨迹记录",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -533,7 +528,7 @@ private fun SummaryContent(
 
 @Composable
 private fun TotalsCard(summary: com.example.xiancli_tools.data.PeriodSummary) {
-    SectionCard(title = "本${summary.period.label}汇总") {
+    SectionCard(title = "${summary.rangeName}汇总") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -702,7 +697,7 @@ private fun SessionListCard(
                 modifier = Modifier.size(18.dp)
             )
             Spacer(Modifier.width(8.dp))
-            Text("在地图上查看本${summary.period.label}全部轨迹")
+            Text("在地图上查看${summary.rangeName}全部轨迹")
         }
     }
 }
@@ -780,6 +775,7 @@ private fun formatSessionTime(startMillis: Long, period: TrackPeriod): String {
         TrackPeriod.WEEK -> "E HH:mm"
         TrackPeriod.MONTH -> "MM-dd HH:mm"
         TrackPeriod.YEAR -> "MM-dd HH:mm"
+        TrackPeriod.CUSTOM -> "MM-dd HH:mm"
     }
     return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(startMillis))
 }

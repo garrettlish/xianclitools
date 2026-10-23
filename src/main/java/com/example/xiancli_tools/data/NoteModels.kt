@@ -23,7 +23,8 @@ enum class NotePeriod(val label: String) {
     DAY("日"),
     WEEK("周"),
     MONTH("月"),
-    YEAR("年")
+    YEAR("年"),
+    CUSTOM("自定义")
 }
 
 data class NoteCategorySummary(
@@ -39,6 +40,21 @@ data class NoteSummary(
     val endMillis: Long,
     val notes: List<Note>
 ) {
+    val range: DateRange
+        get() = DateRange(startMillis, endMillis)
+
+    /** 报表标题用词：本日 / 本周 / 本月 / 本年 / 所选区间。 */
+    val rangeName: String
+        get() = if (period == NotePeriod.CUSTOM) "所选区间" else "本${period.label}"
+
+    /** 趋势峰值描述用词：单日最高 / 单周最高 / 单月最高 / 单年最高。 */
+    val peakLabel: String
+        get() = if (period == NotePeriod.CUSTOM) {
+            "单${TrendBuckets.plan(range).unit.label}最高"
+        } else {
+            "单${period.label}最高"
+        }
+
     val noteCount: Int
         get() = notes.size
 
@@ -60,47 +76,30 @@ object NoteAnalytics {
     fun summarize(
         notes: List<Note>,
         period: NotePeriod,
-        now: Long = System.currentTimeMillis()
+        now: Long = System.currentTimeMillis(),
+        customRange: DateRange? = null
     ): NoteSummary {
-        val start = startOfPeriod(period, now)
-        val end = startOfNextPeriod(period, start)
+        val range = rangeOf(period, now, customRange)
         val inRange = notes
-            .filter { it.timeMillis in start until end }
+            .filter { it.timeMillis in range.startMillis until range.endMillis }
             .sortedByDescending { it.timeMillis }
-        return NoteSummary(period, start, end, inRange)
+        return NoteSummary(period, range.startMillis, range.endMillis, inRange)
     }
 
-    fun startOfPeriod(period: NotePeriod, now: Long): Long {
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = now
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        when (period) {
-            NotePeriod.DAY -> Unit
-            NotePeriod.WEEK -> {
-                val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
-                val daysFromMonday = (dayOfWeek + 5) % 7
-                calendar.add(Calendar.DAY_OF_MONTH, -daysFromMonday)
-            }
-            NotePeriod.MONTH -> calendar.set(Calendar.DAY_OF_MONTH, 1)
-            NotePeriod.YEAR -> calendar.set(Calendar.DAY_OF_YEAR, 1)
-        }
-        return calendar.timeInMillis
+    /** 把「日 / 周 / 月 / 年 / 自定义」统一折算成具体区间。 */
+    fun rangeOf(
+        period: NotePeriod,
+        now: Long,
+        customRange: DateRange? = null
+    ): DateRange = when (period) {
+        NotePeriod.DAY -> DateRanges.day(now)
+        NotePeriod.WEEK -> DateRanges.week(now)
+        NotePeriod.MONTH -> DateRanges.month(now)
+        NotePeriod.YEAR -> DateRanges.year(now)
+        NotePeriod.CUSTOM -> customRange ?: DateRanges.lastDays(now)
     }
 
-    private fun startOfNextPeriod(period: NotePeriod, startMillis: Long): Long {
-        val calendar = Calendar.getInstance().apply { timeInMillis = startMillis }
-        when (period) {
-            NotePeriod.DAY -> calendar.add(Calendar.DAY_OF_MONTH, 1)
-            NotePeriod.WEEK -> calendar.add(Calendar.DAY_OF_MONTH, 7)
-            NotePeriod.MONTH -> calendar.add(Calendar.MONTH, 1)
-            NotePeriod.YEAR -> calendar.add(Calendar.YEAR, 1)
-        }
-        return calendar.timeInMillis
-    }
+    fun startOfPeriod(period: NotePeriod, now: Long): Long = rangeOf(period, now).startMillis
 
     fun trend(summary: NoteSummary): List<NoteTrendBucket> {
         val calendar = Calendar.getInstance()
@@ -146,6 +145,15 @@ object NoteAnalytics {
                 }
                 (0..11).map { NoteTrendBucket("${it + 1}月", buckets[it]) }
             }
+            NotePeriod.CUSTOM -> {
+                val plan = TrendBuckets.plan(summary.range)
+                val buckets = IntArray(plan.size)
+                summary.notes.forEach { note ->
+                    val index = plan.indexOf(note.timeMillis)
+                    if (index in buckets.indices) buckets[index]++
+                }
+                plan.labels.mapIndexed { index, label -> NoteTrendBucket(label, buckets[index]) }
+            }
         }
     }
 
@@ -178,6 +186,7 @@ object NoteAnalytics {
                 calendar.get(Calendar.MONTH) + 1
             )
             NotePeriod.YEAR -> String.format(Locale.CHINA, "%d年", year)
+            NotePeriod.CUSTOM -> DateRanges.formatHeading(summary.range)
         }
     }
 }

@@ -27,7 +27,8 @@ enum class LedgerPeriod(val label: String) {
     DAY("日"),
     WEEK("周"),
     MONTH("月"),
-    YEAR("年")
+    YEAR("年"),
+    CUSTOM("自定义")
 }
 
 data class CategorySummary(
@@ -44,6 +45,21 @@ data class LedgerSummary(
     val endMillis: Long,
     val records: List<ExpenseRecord>
 ) {
+    val range: DateRange
+        get() = DateRange(startMillis, endMillis)
+
+    /** 报表标题用词：本日 / 本周 / 本月 / 本年 / 所选区间。 */
+    val rangeName: String
+        get() = if (period == LedgerPeriod.CUSTOM) "所选区间" else "本${period.label}"
+
+    /** 趋势峰值描述用词：单日最高 / 单周最高 / 单月最高 / 单年最高。 */
+    val peakLabel: String
+        get() = if (period == LedgerPeriod.CUSTOM) {
+            "单${TrendBuckets.plan(range).unit.label}最高"
+        } else {
+            "单${period.label}最高"
+        }
+
     val totalCents: Long
         get() = records.sumOf { it.amountCents }
 
@@ -76,49 +92,30 @@ object LedgerAnalytics {
     fun summarize(
         records: List<ExpenseRecord>,
         period: LedgerPeriod,
-        now: Long = System.currentTimeMillis()
+        now: Long = System.currentTimeMillis(),
+        customRange: DateRange? = null
     ): LedgerSummary {
-        val start = startOfPeriod(period, now)
-        val end = startOfNextPeriod(period, start)
+        val range = rangeOf(period, now, customRange)
         val inRange = records
-            .filter { it.timeMillis in start until end }
+            .filter { it.timeMillis in range.startMillis until range.endMillis }
             .sortedByDescending { it.timeMillis }
-        return LedgerSummary(period, start, end, inRange)
+        return LedgerSummary(period, range.startMillis, range.endMillis, inRange)
     }
 
-    fun startOfPeriod(period: LedgerPeriod, now: Long): Long {
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = now
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        when (period) {
-            LedgerPeriod.DAY -> Unit
-            LedgerPeriod.WEEK -> {
-                val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
-                val daysFromMonday = (dayOfWeek + 5) % 7
-                calendar.add(Calendar.DAY_OF_MONTH, -daysFromMonday)
-            }
-            LedgerPeriod.MONTH -> calendar.set(Calendar.DAY_OF_MONTH, 1)
-            LedgerPeriod.YEAR -> calendar.set(Calendar.DAY_OF_YEAR, 1)
-        }
-        return calendar.timeInMillis
+    /** 把「日 / 周 / 月 / 年 / 自定义」统一折算成具体区间。 */
+    fun rangeOf(
+        period: LedgerPeriod,
+        now: Long,
+        customRange: DateRange? = null
+    ): DateRange = when (period) {
+        LedgerPeriod.DAY -> DateRanges.day(now)
+        LedgerPeriod.WEEK -> DateRanges.week(now)
+        LedgerPeriod.MONTH -> DateRanges.month(now)
+        LedgerPeriod.YEAR -> DateRanges.year(now)
+        LedgerPeriod.CUSTOM -> customRange ?: DateRanges.lastDays(now)
     }
 
-    private fun startOfNextPeriod(period: LedgerPeriod, startMillis: Long): Long {
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = startMillis
-        }
-        when (period) {
-            LedgerPeriod.DAY -> calendar.add(Calendar.DAY_OF_MONTH, 1)
-            LedgerPeriod.WEEK -> calendar.add(Calendar.DAY_OF_MONTH, 7)
-            LedgerPeriod.MONTH -> calendar.add(Calendar.MONTH, 1)
-            LedgerPeriod.YEAR -> calendar.add(Calendar.YEAR, 1)
-        }
-        return calendar.timeInMillis
-    }
+    fun startOfPeriod(period: LedgerPeriod, now: Long): Long = rangeOf(period, now).startMillis
 
     fun trend(summary: LedgerSummary): List<TrendBucket> {
         val calendar = Calendar.getInstance()
@@ -166,6 +163,15 @@ object LedgerAnalytics {
                 }
                 (0..11).map { TrendBucket("${it + 1}月", buckets[it]) }
             }
+            LedgerPeriod.CUSTOM -> {
+                val plan = TrendBuckets.plan(summary.range)
+                val buckets = LongArray(plan.size)
+                summary.records.forEach { record ->
+                    val index = plan.indexOf(record.timeMillis)
+                    if (index in buckets.indices) buckets[index] += record.amountCents
+                }
+                plan.labels.mapIndexed { index, label -> TrendBucket(label, buckets[index]) }
+            }
         }
     }
 
@@ -212,6 +218,7 @@ object LedgerAnalytics {
                 calendar.get(Calendar.MONTH) + 1
             )
             LedgerPeriod.YEAR -> String.format(Locale.CHINA, "%d年", year)
+            LedgerPeriod.CUSTOM -> DateRanges.formatHeading(summary.range)
         }
     }
 }

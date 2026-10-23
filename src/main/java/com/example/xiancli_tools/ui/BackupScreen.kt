@@ -93,8 +93,8 @@ fun BackupScreen(onBack: () -> Unit) {
             busy = false
             result.onSuccess { exported ->
                 notify(
-                    "已导出 记事 ${exported.notes.size} 条 · " +
-                        "记账 ${exported.records.size} 条 · 轨迹 ${exported.sessions.size} 条"
+                    "已导出 备忘 ${exported.notes.size} 条 · " +
+                        "账本 ${exported.records.size} 条 · 足迹 ${exported.sessions.size} 条"
                 )
             }.onFailure { notify("导出失败：${it.message ?: "未知错误"}") }
         }
@@ -129,8 +129,8 @@ fun BackupScreen(onBack: () -> Unit) {
             busy = false
             result.onSuccess {
                 val message = if (replace) {
-                    "已覆盖导入 记事 ${payload.notes.size} 条 · " +
-                        "记账 ${payload.records.size} 条 · 轨迹 ${payload.sessions.size} 条"
+                    "已覆盖导入 备忘 ${payload.notes.size} 条 · " +
+                        "账本 ${payload.records.size} 条 · 足迹 ${payload.sessions.size} 条"
                 } else {
                     val added = incoming.newCountAgainst(before)
                     "已合并导入：新增 $added 条，跳过 ${incoming.totalCount - added} 条"
@@ -169,7 +169,7 @@ fun BackupScreen(onBack: () -> Unit) {
         ) {
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "把记事、记账和轨迹打包成一个 JSON 文件；换手机或重装后导入即可恢复。",
+                text = "把备忘、账本和足迹打包成一个 JSON 文件；换手机或重装后导入即可恢复。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -191,9 +191,9 @@ fun BackupScreen(onBack: () -> Unit) {
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(4.dp))
-                    CountRow("记事", payload.notes.size, NoteAccentColor)
-                    CountRow("记账", payload.records.size, LedgerAccentColor)
-                    CountRow("轨迹", payload.sessions.size, TrackAccentColor)
+                    CountRow("备忘", payload.notes.size, NoteAccentColor)
+                    CountRow("账本", payload.records.size, LedgerAccentColor)
+                    CountRow("足迹", payload.sessions.size, TrackAccentColor)
                 }
             }
 
@@ -299,8 +299,8 @@ private fun ImportConfirmDialog(
         text = {
             Column {
                 Text(
-                    text = "文件中包含：记事 ${incoming.notes.size} 条 · " +
-                        "记账 ${incoming.records.size} 条 · 轨迹 ${incoming.sessions.size} 条。",
+                    text = "文件中包含：备忘 ${incoming.notes.size} 条 · " +
+                        "账本 ${incoming.records.size} 条 · 足迹 ${incoming.sessions.size} 条。",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(Modifier.height(12.dp))
