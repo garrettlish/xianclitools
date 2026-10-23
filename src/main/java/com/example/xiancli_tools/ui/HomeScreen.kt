@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -17,6 +19,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -33,7 +36,6 @@ private val NoteAccent = Color(0xFF7C4DFF)
 private val LedgerAccent = Color(0xFFF59E0B)
 private val TrackAccent = Color(0xFF00897B)
 private val StatsAccent = Color(0xFF34A853)
-private val BackupAccent = Color(0xFF546E7A)
 
 @Composable
 fun HomeScreen(
@@ -54,12 +56,43 @@ fun HomeScreen(
                 .padding(bottom = 24.dp)
         ) {
             Spacer(Modifier.height(12.dp))
-            Text(
-                text = "工具列表",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "工具列表",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Surface(
+                    onClick = onOpenBackup,
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_backup),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "备份",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(12.dp))
             ToolCard(
                 title = "定时器",
@@ -99,14 +132,6 @@ fun HomeScreen(
                 icon = R.drawable.ic_pie_chart,
                 accent = StatsAccent,
                 onClick = onOpenPhoneStats
-            )
-            Spacer(Modifier.height(12.dp))
-            ToolCard(
-                title = "数据备份",
-                subtitle = "一键导出 / 导入记事、记账与轨迹数据",
-                icon = R.drawable.ic_backup,
-                accent = BackupAccent,
-                onClick = onOpenBackup
             )
         }
     }
