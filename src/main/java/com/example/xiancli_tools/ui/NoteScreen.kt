@@ -2,6 +2,7 @@ package com.example.xiancli_tools.ui
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -295,12 +296,22 @@ fun NoteScreen(onBack: () -> Unit) {
         }
     }
 
+    // 编辑态下返回先退出编辑回到明细，而不是直接回首页。
+    fun exitEditToDetail() {
+        resetEditor()
+        tab = NoteTab.DETAIL
+    }
+
+    BackHandler(enabled = editingId != null) { exitEditToDetail() }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("备忘", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        if (editingId != null) exitEditToDetail() else onBack()
+                    }) {
                         Icon(
                             painter = painterResource(R.drawable.ic_back),
                             contentDescription = "返回"

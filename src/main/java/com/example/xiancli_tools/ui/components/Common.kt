@@ -62,12 +62,15 @@ fun MetricTile(
     value: String,
     accent: Color,
     modifier: Modifier = Modifier,
-    container: Color = MaterialTheme.colorScheme.surfaceContainer
+    container: Color = MaterialTheme.colorScheme.surfaceContainer,
+    centered: Boolean = false
 ) {
+    val alignment = if (centered) Alignment.CenterHorizontally else Alignment.Start
     Column(
         modifier = modifier
             .background(container, RoundedCornerShape(14.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalAlignment = alignment
     ) {
         Text(
             text = label,

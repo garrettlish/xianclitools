@@ -100,7 +100,10 @@ private enum class TrackTab(val label: String) {
 fun TrackScreen(
     onBack: () -> Unit,
     /** 只传 id：地图页自己去仓库取点阵，这里不该把坐标读进内存。 */
-    onOpenMap: (List<Long>) -> Unit
+    onOpenMap: (List<Long>) -> Unit,
+    /** 足迹页会被地图页进出打断，tab 由外层记住，返回时恢复原标签。 */
+    initialTabOrdinal: Int = TrackTab.RECORD.ordinal,
+    onTabChanged: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
     val repository = remember { TrackRepository(context) }
@@ -108,7 +111,9 @@ fun TrackScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val snapshot by TrackRecorderState.state.collectAsState()
-    var tab by remember { mutableStateOf(TrackTab.RECORD) }
+    var tab by remember {
+        mutableStateOf(TrackTab.entries.getOrElse(initialTabOrdinal) { TrackTab.RECORD })
+    }
     var sessions by remember { mutableStateOf<List<TrackBrief>>(emptyList()) }
     var selectedMode by remember { mutableStateOf(TransportMode.WALK) }
     // 统计默认落在当月（而不是今天），进门就能看到整月的轨迹。
@@ -221,7 +226,10 @@ fun TrackScreen(
             SegmentedTabs(
                 labels = TrackTab.entries.map { it.label },
                 selectedIndex = tab.ordinal,
-                onSelect = { tab = TrackTab.entries[it] },
+                onSelect = {
+                    tab = TrackTab.entries[it]
+                    onTabChanged(it)
+                },
                 accent = TrackAccent,
                 modifier = Modifier
                     .padding(horizontal = 16.dp)

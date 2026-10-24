@@ -11,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -40,6 +41,8 @@ fun AppRoot(
     onIncomingBackupConsumed: () -> Unit = {}
 ) {
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
+    // 足迹页的标签序号：进地图页再返回时恢复原标签（明细里点轨迹回来还停在明细）。
+    var trackTabOrdinal by rememberSaveable { mutableStateOf(0) }
     val context = LocalContext.current
 
     LaunchedEffect(incomingBackup) {
@@ -76,7 +79,11 @@ fun AppRoot(
             onOpenTimer = { screen = Screen.Timer },
             onOpenNote = { screen = Screen.Note },
             onOpenLedger = { screen = Screen.Ledger },
-            onOpenTrack = { screen = Screen.Track },
+            onOpenTrack = {
+                // 从首页进足迹时回到默认「记录」标签；从地图页返回时保持原标签。
+                trackTabOrdinal = 0
+                screen = Screen.Track
+            },
             onOpenDrink = { screen = Screen.Drink },
             onOpenTrip = { screen = Screen.Trip },
             onOpenReview = { screen = Screen.Review },
@@ -94,7 +101,9 @@ fun AppRoot(
         )
         Screen.Track -> TrackScreen(
             onBack = { screen = Screen.Home },
-            onOpenMap = { screen = Screen.TrackMap(it) }
+            onOpenMap = { screen = Screen.TrackMap(it) },
+            initialTabOrdinal = trackTabOrdinal,
+            onTabChanged = { trackTabOrdinal = it }
         )
         is Screen.TrackMap -> TrackMapScreen(
             sessionIds = current.sessionIds,

@@ -962,19 +962,22 @@ private fun ReportTab(
                     modifier = Modifier.weight(1f),
                     label = "有记录",
                     value = "${summary.activeDays} 天",
-                    accent = DrinkAccent
+                    accent = DrinkAccent,
+                    centered = true
                 )
                 MetricTile(
                     modifier = Modifier.weight(1f),
                     label = if (period == DrinkPeriod.YEAR) "月均" else "日均",
                     value = averagePerUnitText(summary, now),
-                    accent = DrinkAccent
+                    accent = DrinkAccent,
+                    centered = true
                 )
                 MetricTile(
                     modifier = Modifier.weight(1f),
                     label = "最多",
                     value = topCategory?.name ?: "—",
-                    accent = topCategory?.let { parseHexColor(it.colorHex) } ?: DrinkAccent
+                    accent = topCategory?.let { parseHexColor(it.colorHex) } ?: DrinkAccent,
+                    centered = true
                 )
             }
         }
