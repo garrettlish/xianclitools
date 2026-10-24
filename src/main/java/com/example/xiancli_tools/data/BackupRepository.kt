@@ -10,10 +10,11 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 备份的落盘与恢复：把记事、记账、轨迹、专注记录、饮记、出行打包成单个 JSON 文件，
+ * 备份的落盘与恢复：把记事、记账、轨迹、专注记录、饮记、出行打包成单个文件，
  * 或者从这样一个文件里把数据写回本地。
  *
  * 文件读写走 SAF（系统文件选择器）给出的 Uri，因此不需要任何存储权限。
+ * 格式是 [BackupContainer] 定义的 zip（内含 `backup.json`），老的裸 JSON 备份也能导入。
  */
 class BackupRepository(context: Context) {
 
@@ -44,16 +45,15 @@ class BackupRepository(context: Context) {
         val payload = snapshot()
         val stream = appContext.contentResolver.openOutputStream(uri)
             ?: throw FileNotFoundException("无法写入所选文件")
-        stream.use { it.write(BackupCodec.encode(payload).toByteArray(Charsets.UTF_8)) }
+        stream.use { BackupContainer.write(payload, it) }
         return payload
     }
 
-    /** 从指定 Uri 读取并解析备份文件。 */
+    /** 从指定 Uri 读取并解析备份文件（zip 或老的裸 JSON 都认）。 */
     fun read(uri: Uri): BackupPayload {
         val stream = appContext.contentResolver.openInputStream(uri)
             ?: throw FileNotFoundException("无法读取所选文件")
-        val text = stream.use { it.readBytes().toString(Charsets.UTF_8) }
-        return BackupCodec.decode(text)
+        return stream.use { BackupContainer.read(it) }
     }
 
     /**
@@ -65,8 +65,8 @@ class BackupRepository(context: Context) {
     fun writeShareFile(now: Long = System.currentTimeMillis()): Uri {
         val dir = File(appContext.cacheDir, "backup").apply { mkdirs() }
         val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.CHINA).format(Date(now))
-        val file = File(dir, "朝夕备份-$stamp.json")
-        file.writeText(BackupCodec.encode(snapshot(), now), Charsets.UTF_8)
+        val file = File(dir, "朝夕备份-$stamp.zip")
+        file.outputStream().use { BackupContainer.write(snapshot(), it, now) }
         return FileProvider.getUriForFile(
             appContext,
             "${appContext.packageName}.fileprovider",

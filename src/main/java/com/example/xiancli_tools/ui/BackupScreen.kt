@@ -102,7 +102,7 @@ fun BackupScreen(
     }
 
     val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
+        ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
@@ -174,7 +174,7 @@ fun BackupScreen(
             busy = false
             result.onSuccess { uri ->
                 val send = Intent(Intent.ACTION_SEND).apply {
-                    type = "application/json"
+                    type = "application/zip"
                     putExtra(Intent.EXTRA_STREAM, uri)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
@@ -214,7 +214,7 @@ fun BackupScreen(
         ) {
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "把备忘、账本、足迹、饮记等全部数据打包成一个 JSON 文件；换手机或重装后导入即可恢复。",
+                text = "把备忘、账本、足迹、饮记等全部数据打包成一个 zip 文件（里面是一份 JSON）；换手机或重装后导入即可恢复。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -282,7 +282,7 @@ fun BackupScreen(
             OutlinedButton(
                 onClick = {
                     exportLauncher.launch(
-                        "朝夕备份-${SimpleDateFormat("yyyyMMdd-HHmm", Locale.CHINA).format(Date())}.json"
+                        "朝夕备份-${SimpleDateFormat("yyyyMMdd-HHmm", Locale.CHINA).format(Date())}.zip"
                     )
                 },
                 enabled = !busy,
@@ -302,7 +302,13 @@ fun BackupScreen(
             OutlinedButton(
                 onClick = {
                     importLauncher.launch(
-                        arrayOf("application/json", "text/plain", "application/octet-stream")
+                        arrayOf(
+                            "application/zip",
+                            "application/x-zip-compressed",
+                            "application/json",
+                            "text/plain",
+                            "application/octet-stream"
+                        )
                     )
                 },
                 enabled = !busy,
@@ -320,7 +326,8 @@ fun BackupScreen(
             Spacer(Modifier.height(12.dp))
             Text(
                 text = "「附近直传」要求两台设备连同一个 Wi-Fi：双方都打开该页面，点一下对方设备名即可，速度最快且不经过任何服务。" +
-                    "「分享到其他设备」走系统分享面板（微信、蓝牙都行），对方点开文件后选「用其他应用打开 → 朝夕」也能导入。",
+                    "「分享到其他设备」走系统分享面板（微信、蓝牙都行），对方点开文件后选「用其他应用打开 → 朝夕」也能导入；" +
+                    "老版本导出的 .json 备份同样能导入。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

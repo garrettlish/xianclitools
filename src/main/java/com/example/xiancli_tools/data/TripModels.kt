@@ -55,7 +55,7 @@ object TripAnalytics {
     fun summarize(
         trip: Trip,
         records: List<ExpenseRecord>,
-        tracks: List<TrackSession>,
+        tracks: List<TrackBrief>,
         notes: List<Note>
     ): TripSummary {
         val range = trip.range

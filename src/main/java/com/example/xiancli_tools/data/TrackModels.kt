@@ -38,6 +38,35 @@ data class TrackSession(
             points.size >= 2 -> points.last().timeMillis - points.first().timeMillis
             else -> 0L
         }
+
+    fun toBrief(): TrackBrief = TrackBrief(
+        id = id,
+        mode = mode,
+        startMillis = startMillis,
+        endMillis = endMillis,
+        distanceMeters = distanceMeters,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt
+    )
+}
+
+/**
+ * 不含点阵的轨迹骨架：列表、明细、统计、回顾、出行只用得到这些字段。
+ *
+ * 单独一个类型而不是「points 为空的 TrackSession」，是为了让「拿着摘要去画地图」
+ * 这种错误在编译期就不可能——地图那条路走的是 `TrackRepository.loadSessions(ids)`。
+ */
+data class TrackBrief(
+    val id: Long,
+    val mode: TransportMode,
+    val startMillis: Long,
+    val endMillis: Long,
+    val distanceMeters: Double,
+    val updatedAt: Long = endMillis,
+    val deletedAt: Long? = null
+) {
+    val durationMillis: Long
+        get() = if (endMillis > startMillis) endMillis - startMillis else 0L
 }
 
 enum class TrackPeriod(val label: String) {
@@ -59,7 +88,7 @@ data class PeriodSummary(
     val period: TrackPeriod,
     val startMillis: Long,
     val endMillis: Long,
-    val sessions: List<TrackSession>
+    val sessions: List<TrackBrief>
 ) {
     val range: DateRange
         get() = DateRange(startMillis, endMillis)
@@ -101,7 +130,7 @@ object TrackAnalytics {
     }
 
     fun summarize(
-        sessions: List<TrackSession>,
+        sessions: List<TrackBrief>,
         period: TrackPeriod,
         now: Long = System.currentTimeMillis(),
         customRange: DateRange? = null

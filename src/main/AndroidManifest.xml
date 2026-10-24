@@ -49,14 +49,17 @@
             </intent-filter>
 
             <!--
-              接收备份文件：在微信、文件管理器里点开 .json 备份后选「用其他应用打开 → 朝夕」，
-              直接进备份页的合并确认。两条 filter 分别对应「打开文件」和「分享给应用」。
+              接收备份文件：在微信、文件管理器里点开备份后选「用其他应用打开 → 朝夕」，
+              直接进备份页的合并确认。zip 是现在的格式，json 是为了兼容老版本导出的备份；
+              两条 filter 分别对应「打开文件」和「分享给应用」。
             -->
             <intent-filter android:label="@string/import_backup_label">
                 <action android:name="android.intent.action.VIEW" />
 
                 <category android:name="android.intent.category.DEFAULT" />
 
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
                 <data android:mimeType="application/json" />
             </intent-filter>
             <intent-filter android:label="@string/import_backup_label">
@@ -64,6 +67,8 @@
 
                 <category android:name="android.intent.category.DEFAULT" />
 
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
                 <data android:mimeType="application/json" />
             </intent-filter>
         </activity>

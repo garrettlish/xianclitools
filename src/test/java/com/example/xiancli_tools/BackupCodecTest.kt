@@ -1,6 +1,7 @@
 package com.example.xiancli_tools
 
 import com.example.xiancli_tools.data.BackupCodec
+import com.example.xiancli_tools.data.BackupContainer
 import com.example.xiancli_tools.data.BackupFormatException
 import com.example.xiancli_tools.data.BackupPayload
 import com.example.xiancli_tools.data.DrinkCategory
@@ -8,6 +9,8 @@ import com.example.xiancli_tools.data.DrinkDefaults
 import com.example.xiancli_tools.data.DrinkRecord
 import com.example.xiancli_tools.data.ExpenseCategory
 import com.example.xiancli_tools.data.ExpenseRecord
+import com.example.xiancli_tools.data.JsonCodec
+import com.example.xiancli_tools.data.JsonStream
 import com.example.xiancli_tools.data.MergeDiff
 import com.example.xiancli_tools.data.Note
 import com.example.xiancli_tools.data.NoteCategory
@@ -16,12 +19,16 @@ import com.example.xiancli_tools.data.TrackPoint
 import com.example.xiancli_tools.data.TrackSession
 import com.example.xiancli_tools.data.TransportMode
 import com.example.xiancli_tools.data.Trip
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.StringReader
 
 class BackupCodecTest {
 
@@ -392,5 +399,149 @@ class BackupCodecTest {
 
         val water = merged.drinkCategories.first { it.id == DrinkDefaults.stableId("water") }
         assertEquals("白水", water.name)
+    }
+
+    // ---- 容器：zip 与流式读写 ----
+
+    @Test
+    fun `导出的备份是 zip，读回来数据一致`() {
+        val original = samplePayload()
+        val bytes = ByteArrayOutputStream()
+            .also { BackupContainer.write(original, it) }
+            .toByteArray()
+
+        assertEquals("zip 本地文件头是 PK\\003\\004", 'P'.code.toByte(), bytes[0])
+        assertEquals(original, BackupContainer.read(ByteArrayInputStream(bytes)))
+    }
+
+    @Test
+    fun `压缩后体积明显小于裸 JSON`() {
+        val payload = BackupPayload(sessions = listOf(longSession(pointCount = 1200)))
+        val zipped = ByteArrayOutputStream()
+            .also { BackupContainer.write(payload, it) }
+            .size()
+        val raw = BackupCodec.encode(payload).toByteArray(Charsets.UTF_8).size
+
+        assertTrue("压缩包 ${zipped}B 应当明显小于裸 JSON ${raw}B", zipped * 2 <= raw)
+    }
+
+    @Test
+    fun `老版本导出的裸 JSON 仍然能导入`() {
+        val original = samplePayload()
+        val plain = BackupCodec.encode(original).toByteArray(Charsets.UTF_8)
+
+        assertEquals(original, BackupContainer.read(ByteArrayInputStream(plain)))
+    }
+
+    @Test
+    fun `带缩进的备份也能读`() {
+        // 老版本的导出是两空格缩进的，流式读取要能穿过换行和空白。
+        val pretty = JSONObject(BackupCodec.encode(samplePayload())).toString(2)
+
+        val restored = BackupCodec.decode(pretty)
+
+        assertEquals(1, restored.notes.size)
+        assertEquals(2, restored.sessions.single().points.size)
+    }
+
+    @Test
+    fun `备忘正文里的括号引号和换行不会打乱分条`() {
+        val tricky = "他说 \"别记了\" ] } { },\n第二行 \\ 反斜杠，还有 emoji 🚀"
+        val payload = BackupPayload(
+            notes = listOf(
+                Note(1L, NoteCategory.DIARY, tricky, 10L),
+                Note(2L, NoteCategory.DIARY, "下一条", 20L)
+            )
+        )
+
+        val restored = BackupCodec.decode(BackupCodec.encode(payload))
+
+        assertEquals(tricky, restored.notes.first { it.id == 1L }.content)
+        assertEquals("后面那条不能被前一条的引号带跑", 2, restored.notes.size)
+    }
+
+    @Test
+    fun `读摘要时整段跳过点阵`() {
+        val encoded = BackupCodec.encode(
+            BackupPayload(sessions = listOf(longSession(pointCount = 3)))
+        )
+        val stream = JsonStream(StringReader(encoded))
+        stream.beginObject()
+        var raw = ""
+        while (true) {
+            val key = stream.nextMember() ?: break
+            if (key == "tracks") {
+                stream.beginArray()
+                while (stream.nextElement()) {
+                    raw = stream.readRawValue(skipFields = setOf(JsonCodec.FIELD_POINTS))
+                }
+            } else {
+                stream.skipValue()
+            }
+        }
+
+        assertFalse("点阵不该被复制下来", raw.contains("31.23"))
+        assertTrue("字段位置要留个 null，JSON 才合法", raw.contains("\"points\":null"))
+        val session = JsonCodec.sessionFromJson(JSONObject(raw))
+        assertEquals(3000L, session.id)
+        assertTrue(session.points.isEmpty())
+    }
+
+    @Test
+    fun `坐标只保留六位小数`() {
+        // 6 位约 0.11 米，比 GPS 精度细得多；从 18 位数字缩到 9 位，点阵能省两成体积。
+        val payload = BackupPayload(
+            sessions = listOf(
+                TrackSession(
+                    id = 1L,
+                    mode = TransportMode.WALK,
+                    startMillis = 1L,
+                    endMillis = 2L,
+                    distanceMeters = 1.0,
+                    points = listOf(
+                        TrackPoint(31.234567890123456, 121.476543298765432, 5L)
+                    )
+                )
+            )
+        )
+
+        val point = BackupCodec.decode(BackupCodec.encode(payload)).sessions.single().points.single()
+
+        assertEquals(31.234568, point.latitude, 0.0)
+        assertEquals(121.476543, point.longitude, 0.0)
+    }
+
+    @Test
+    fun `压缩包里没有备份文件时报错而不是静默清空`() {
+        val emptyZip = ByteArrayOutputStream()
+            .also { out ->
+                java.util.zip.ZipOutputStream(out).use { it.putNextEntry(java.util.zip.ZipEntry("x")) }
+            }
+            .toByteArray()
+
+        val error = runCatching {
+            BackupContainer.read(ByteArrayInputStream(emptyZip))
+        }.exceptionOrNull()
+
+        assertTrue(error is BackupFormatException)
+    }
+
+    /** 一条「一小时的轨迹」：3 秒一个点、坐标在小数点后第 4 位起变化。 */
+    private fun longSession(pointCount: Int, id: Long = 3000L): TrackSession {
+        val start = 1_700_000_200_000L
+        return TrackSession(
+            id = id,
+            mode = TransportMode.WALK,
+            startMillis = start,
+            endMillis = start + pointCount * 3_000L,
+            distanceMeters = pointCount * 3.0,
+            points = (0 until pointCount).map { index ->
+                TrackPoint(
+                    latitude = 31.2345 + index * 0.00004,
+                    longitude = 121.4765 + index * 0.00005,
+                    timeMillis = start + index * 3_000L
+                )
+            }
+        )
     }
 }

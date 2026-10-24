@@ -56,7 +56,7 @@ import com.example.xiancli_tools.data.NoteRepository
 import com.example.xiancli_tools.data.ReviewAnalytics
 import com.example.xiancli_tools.data.TrackAnalytics
 import com.example.xiancli_tools.data.TrackRepository
-import com.example.xiancli_tools.data.TrackSession
+import com.example.xiancli_tools.data.TrackBrief
 import com.example.xiancli_tools.data.Trip
 import com.example.xiancli_tools.data.TripAnalytics
 import com.example.xiancli_tools.data.TripCandidate
@@ -94,7 +94,7 @@ fun TripScreen(onBack: () -> Unit) {
 
     var trips by remember { mutableStateOf<List<Trip>>(emptyList()) }
     var records by remember { mutableStateOf<List<ExpenseRecord>>(emptyList()) }
-    var sessions by remember { mutableStateOf<List<TrackSession>>(emptyList()) }
+    var sessions by remember { mutableStateOf<List<TrackBrief>>(emptyList()) }
     var notes by remember { mutableStateOf<List<Note>>(emptyList()) }
     var showCreate by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Trip?>(null) }
@@ -103,7 +103,7 @@ fun TripScreen(onBack: () -> Unit) {
         withContext(Dispatchers.IO) {
             trips = tripRepository.loadTrips()
             records = ledgerRepository.loadRecords()
-            sessions = trackRepository.loadSessions()
+            sessions = trackRepository.loadSessionIndex()
             notes = noteRepository.loadNotes()
         }
     }

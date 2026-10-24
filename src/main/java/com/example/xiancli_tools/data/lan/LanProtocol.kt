@@ -19,7 +19,13 @@ object LanProtocol {
     /** 设备名放在请求头里，值经过百分号编码，中文型号名也能原样过去。 */
     const val HEADER_DEVICE = "X-Xiancli-Device"
 
-    /** 单个请求体上限。足迹点阵是体积大头，一小时轨迹几 MB，64MB 足够且能挡住乱来的请求。 */
+    /**
+     * 单个请求体上限。
+     *
+     * 足迹点阵是体积大头，但没想象中大：3 秒一个点、1 小时约 1200 个，
+     * 紧凑 JSON 下约 40KB/小时，64MB 够放 1600 小时的轨迹（按每天通勤 1 小时算是六年多）。
+     * 上限放在这里主要是挡住乱来的请求，不是给正常用户准备的。
+     */
     const val MAX_BODY_BYTES = 64 * 1024 * 1024
 
     private const val MAX_HEADER_BYTES = 8 * 1024

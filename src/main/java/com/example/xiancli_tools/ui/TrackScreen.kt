@@ -59,9 +59,9 @@ import com.example.xiancli_tools.data.DateRange
 import com.example.xiancli_tools.data.DateRanges
 import com.example.xiancli_tools.data.PeriodSummary
 import com.example.xiancli_tools.data.TrackAnalytics
+import com.example.xiancli_tools.data.TrackBrief
 import com.example.xiancli_tools.data.TrackPeriod
 import com.example.xiancli_tools.data.TrackRepository
-import com.example.xiancli_tools.data.TrackSession
 import com.example.xiancli_tools.data.TransportMode
 import com.example.xiancli_tools.track.RecorderSnapshot
 import com.example.xiancli_tools.track.TrackRecorderService
@@ -99,7 +99,8 @@ private enum class TrackTab(val label: String) {
 @Composable
 fun TrackScreen(
     onBack: () -> Unit,
-    onOpenMap: (List<TrackSession>) -> Unit
+    /** 只传 id：地图页自己去仓库取点阵，这里不该把坐标读进内存。 */
+    onOpenMap: (List<Long>) -> Unit
 ) {
     val context = LocalContext.current
     val repository = remember { TrackRepository(context) }
@@ -108,14 +109,14 @@ fun TrackScreen(
 
     val snapshot by TrackRecorderState.state.collectAsState()
     var tab by remember { mutableStateOf(TrackTab.RECORD) }
-    var sessions by remember { mutableStateOf<List<TrackSession>>(emptyList()) }
+    var sessions by remember { mutableStateOf<List<TrackBrief>>(emptyList()) }
     var selectedMode by remember { mutableStateOf(TransportMode.WALK) }
     // 统计默认落在当月（而不是今天），进门就能看到整月的轨迹。
     var period by remember { mutableStateOf(TrackPeriod.MONTH) }
     var customRange by remember { mutableStateOf(DateRanges.lastDays()) }
     var elapsed by remember { mutableLongStateOf(0L) }
     var pendingMode by remember { mutableStateOf<TransportMode?>(null) }
-    var pendingDelete by remember { mutableStateOf<TrackSession?>(null) }
+    var pendingDelete by remember { mutableStateOf<TrackBrief?>(null) }
 
     val recordScroll = rememberScrollState()
     val detailScroll = rememberScrollState()
@@ -149,7 +150,7 @@ fun TrackScreen(
                 )
                 repo.clearActiveSession()
             }
-            repo.loadSessions() to (active != null)
+            repo.loadSessionIndex() to (active != null)
         }
         sessions = loaded
         if (recovered) {
@@ -173,10 +174,10 @@ fun TrackScreen(
         TrackAnalytics.summarize(sessions, period, customRange = customRange)
     }
 
-    fun delete(session: TrackSession) {
+    fun delete(session: TrackBrief) {
         scope.launch {
             withContext(Dispatchers.IO) { repository.deleteSession(session.id) }
-            sessions = withContext(Dispatchers.IO) { repository.loadSessions() }
+            sessions = withContext(Dispatchers.IO) { repository.loadSessionIndex() }
             snackbarHostState.showSnackbar("已删除")
         }
     }
@@ -710,8 +711,8 @@ private fun ModeBreakdownCard(summary: PeriodSummary) {
 @Composable
 private fun TrackDetailList(
     summary: PeriodSummary,
-    onOpenMap: (List<TrackSession>) -> Unit,
-    onDelete: (TrackSession) -> Unit
+    onOpenMap: (List<Long>) -> Unit,
+    onDelete: (TrackBrief) -> Unit
 ) {
     if (summary.sessions.isEmpty()) {
         EmptyReportCard(
@@ -737,7 +738,7 @@ private fun TrackDetailList(
                         SessionRow(
                             session = session,
                             timeText = formatClock(session.startMillis),
-                            onClick = { onOpenMap(listOf(session)) },
+                            onClick = { onOpenMap(listOf(session.id)) },
                             onDelete = { onDelete(session) }
                         )
                     }
@@ -745,7 +746,7 @@ private fun TrackDetailList(
             }
         }
         OutlinedButton(
-            onClick = { onOpenMap(summary.sessions) },
+            onClick = { onOpenMap(summary.sessions.map { it.id }) },
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(
@@ -761,7 +762,7 @@ private fun TrackDetailList(
 
 @Composable
 private fun SessionRow(
-    session: TrackSession,
+    session: TrackBrief,
     timeText: String,
     onClick: () -> Unit,
     onDelete: () -> Unit

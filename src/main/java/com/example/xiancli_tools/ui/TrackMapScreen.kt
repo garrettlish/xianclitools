@@ -27,30 +27,55 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.TrackAnalytics
+import com.example.xiancli_tools.data.TrackRepository
 import com.example.xiancli_tools.data.TrackSession
 import com.example.xiancli_tools.data.TransportMode
 import com.example.xiancli_tools.ui.components.IconBadge
 import com.example.xiancli_tools.ui.components.MapTrack
 import com.example.xiancli_tools.ui.components.TrackMap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * 轨迹地图。
+ *
+ * 只接收 id，点阵在这里才去仓库取：整个 App 里**只有这一条**路径会把坐标读进内存，
+ * 列表页和统计页拿的是 [com.example.xiancli_tools.data.TrackBrief]。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrackMapScreen(
-    sessions: List<TrackSession>,
+    sessionIds: List<Long>,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    var sessions by remember { mutableStateOf<List<TrackSession>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(sessionIds) {
+        sessions = withContext(Dispatchers.IO) {
+            TrackRepository(context).loadSessions(sessionIds)
+        }
+        loading = false
+    }
+
     val tracks = remember(sessions) {
         sessions.filter { it.points.isNotEmpty() }
             .map { MapTrack(it.mode, it.points) }
@@ -60,7 +85,7 @@ fun TrackMapScreen(
     }
     val totalDistance = remember(sessions) { sessions.sumOf { it.distanceMeters } }
     val totalDuration = remember(sessions) { sessions.sumOf { it.durationMillis } }
-    val title = if (sessions.size == 1) "轨迹地图" else "轨迹地图（${sessions.size} 条）"
+    val title = if (sessionIds.size == 1) "轨迹地图" else "轨迹地图（${sessionIds.size} 条）"
 
     Scaffold(
         topBar = {
@@ -89,6 +114,14 @@ fun TrackMapScreen(
                 .padding(bottom = 24.dp)
         ) {
             Spacer(Modifier.height(8.dp))
+            if (loading) {
+                Text(
+                    text = "正在读取轨迹点…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                return@Column
+            }
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(

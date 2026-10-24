@@ -8,8 +8,7 @@ import com.example.xiancli_tools.data.NoteCategory
 import com.example.xiancli_tools.data.ReviewAnalytics
 import com.example.xiancli_tools.data.ReviewPeriod
 import com.example.xiancli_tools.data.TimerSession
-import com.example.xiancli_tools.data.TrackPoint
-import com.example.xiancli_tools.data.TrackSession
+import com.example.xiancli_tools.data.TrackBrief
 import com.example.xiancli_tools.data.TransportMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -40,13 +39,12 @@ class ReviewAnalyticsTest {
             ExpenseRecord(2L, ExpenseCategory.FOOD, 1_000L, "", at(10, 2))
         )
         val tracks = listOf(
-            TrackSession(
+            TrackBrief(
                 id = 1L,
                 mode = TransportMode.BIKE,
                 startMillis = at(10, 20),
                 endMillis = at(10, 20) + 30 * minute,
-                distanceMeters = 1_200.0,
-                points = listOf(TrackPoint(31.2, 121.4, at(10, 20)))
+                distanceMeters = 1_200.0
             )
         )
         val timers = listOf(

@@ -1,7 +1,13 @@
 package com.example.xiancli_tools.data
 
-import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
+import java.io.InputStream
+import java.io.InputStreamReader
+import java.io.Reader
+import java.io.StringReader
+import java.io.StringWriter
+import java.io.Writer
 
 /** 一次备份所包含的全部数据。 */
 data class BackupPayload(
@@ -185,6 +191,11 @@ class BackupFormatException(message: String) : Exception(message)
  * - 4：「习惯」下线，换成「饮记」——`habits` 数组不再写出也不再读取，
  *      改为 `drinkCategories` / `drinkRecords`。读 1–3 时习惯数据会被静默忽略，
  *      其余类型照常导入；schema 4 的文件不能被旧版 App 读取。
+ *
+ * 从哪一版起读写是流式的（**格式没变**，只是不再一次性把整份备份读进内存）：
+ * - 写：一条一条序列化后直接写进 `Writer`，不再先拼出一个几十 MB 的 String；
+ * - 读：用 [JsonStream] 按元素切分，同一时刻只有一条记录在内存里。
+ * 3 年的足迹备份大约 20MB，整份读进内存时峰值要 60MB 以上，中低端机导入会 OOM。
  */
 object BackupCodec {
 
@@ -199,54 +210,148 @@ object BackupCodec {
      */
     private const val APP_TAG = "fangcun"
 
+    /** 整份备份的文本（局域网直传要算 Content-Length，必须拿到完整字节）。 */
     fun encode(payload: BackupPayload, exportedAt: Long = System.currentTimeMillis()): String {
-        val root = JSONObject()
-            .put("app", APP_TAG)
-            .put("schema", SCHEMA_VERSION)
-            .put("exportedAt", exportedAt)
-            .put(
-                "counts",
-                JSONObject()
-                    .put("notes", payload.notes.size)
-                    .put("ledger", payload.records.size)
-                    .put("tracks", payload.sessions.size)
-                    .put("timers", payload.timers.size)
-                    .put("drinkCategories", payload.drinkCategories.size)
-                    .put("drinkRecords", payload.drinkRecords.size)
-                    .put("trips", payload.trips.size)
-            )
-            .put("notes", JsonCodec.notesToJson(payload.notes))
-            .put("ledger", JsonCodec.recordsToJson(payload.records))
-            .put("tracks", JsonCodec.sessionsToJson(payload.sessions))
-            .put("timers", JsonCodec.timerSessionsToJson(payload.timers))
-            .put("drinkCategories", JsonCodec.drinkCategoriesToJson(payload.drinkCategories))
-            .put("drinkRecords", JsonCodec.drinkRecordsToJson(payload.drinkRecords))
-            .put("trips", JsonCodec.tripsToJson(payload.trips))
-        return root.toString(2)
+        val writer = StringWriter()
+        encodeTo(payload, writer, exportedAt)
+        return writer.toString()
     }
 
-    fun decode(text: String): BackupPayload {
-        val root = runCatching { JSONObject(text) }.getOrElse {
+    /**
+     * 逐条写出。全程只持有一条记录的 JSON 文本，不再把整份备份拼进一个 String。
+     *
+     * 输出是紧凑 JSON（没有缩进）：缩进会让体积涨到 2.4 倍，而备份是给机器读的，
+     * 要看内容用任何 JSON 工具格式化一下即可。
+     */
+    fun encodeTo(
+        payload: BackupPayload,
+        out: Writer,
+        exportedAt: Long = System.currentTimeMillis()
+    ) {
+        out.write("{\"app\":\"")
+        out.write(APP_TAG)
+        out.write("\",\"schema\":")
+        out.write(SCHEMA_VERSION.toString())
+        out.write(",\"exportedAt\":")
+        out.write(exportedAt.toString())
+        out.write(",\"counts\":{\"notes\":")
+        out.write(payload.notes.size.toString())
+        out.write(",\"ledger\":")
+        out.write(payload.records.size.toString())
+        out.write(",\"tracks\":")
+        out.write(payload.sessions.size.toString())
+        out.write(",\"timers\":")
+        out.write(payload.timers.size.toString())
+        out.write(",\"drinkCategories\":")
+        out.write(payload.drinkCategories.size.toString())
+        out.write(",\"drinkRecords\":")
+        out.write(payload.drinkRecords.size.toString())
+        out.write(",\"trips\":")
+        out.write(payload.trips.size.toString())
+        out.write("}")
+        writeArray(out, "notes", payload.notes) { JsonCodec.noteToJson(it) }
+        writeArray(out, "ledger", payload.records) { JsonCodec.recordToJson(it) }
+        writeArray(out, "tracks", payload.sessions) { JsonCodec.sessionToJson(it) }
+        writeArray(out, "timers", payload.timers) { JsonCodec.timerSessionToJson(it) }
+        writeArray(out, "drinkCategories", payload.drinkCategories) {
+            JsonCodec.drinkCategoryToJson(it)
+        }
+        writeArray(out, "drinkRecords", payload.drinkRecords) { JsonCodec.drinkRecordToJson(it) }
+        writeArray(out, "trips", payload.trips) { JsonCodec.tripToJson(it) }
+        out.write("}")
+    }
+
+    private inline fun <T> writeArray(out: Writer, name: String, items: List<T>, toJson: (T) -> JSONObject) {
+        out.write(",\"")
+        out.write(name)
+        out.write("\":[")
+        items.forEachIndexed { index, item ->
+            if (index > 0) out.write(",")
+            out.write(toJson(item).toString())
+        }
+        out.write("]")
+    }
+
+    fun decode(text: String): BackupPayload = decodeFrom(StringReader(text))
+
+    fun decodeFrom(input: InputStream): BackupPayload =
+        decodeFrom(InputStreamReader(input, Charsets.UTF_8))
+
+    /**
+     * 流式读取：每读到一个元素就解析成对象，解析完立刻丢掉原文。
+     *
+     * 字段顺序无所谓，认不出的键（比如 schema 3 里的 `habits`）整段跳过，
+     * 所以旧备份、被手工改过的备份都还能导。
+     */
+    fun decodeFrom(reader: Reader): BackupPayload {
+        val stream = JsonStream(reader)
+        try {
+            stream.beginObject()
+        } catch (e: JsonStreamException) {
             throw BackupFormatException("不是有效的 JSON 文件")
         }
-        val schema = root.optInt("schema", -1)
+
+        var schema = -1L
+        var notes = emptyList<Note>()
+        var records = emptyList<ExpenseRecord>()
+        var sessions = emptyList<TrackSession>()
+        var timers = emptyList<TimerSession>()
+        var drinkCategories = emptyList<DrinkCategory>()
+        var drinkRecords = emptyList<DrinkRecord>()
+        var trips = emptyList<Trip>()
+        try {
+            while (true) {
+                when (val key = stream.nextMember() ?: break) {
+                    "schema" -> schema = stream.readLong()
+                    "notes" -> notes = stream.readElements { JsonCodec.noteFromJson(it) }
+                    "ledger" -> records = stream.readElements { JsonCodec.recordFromJson(it) }
+                    "tracks" -> sessions = stream.readElements { JsonCodec.sessionFromJson(it) }
+                    "timers" -> timers = stream.readElements { JsonCodec.timerSessionFromJson(it) }
+                    "drinkCategories" -> drinkCategories =
+                        stream.readElements { JsonCodec.drinkCategoryFromJson(it) }
+
+                    "drinkRecords" -> drinkRecords =
+                        stream.readElements { JsonCodec.drinkRecordFromJson(it) }
+
+                    "trips" -> trips = stream.readElements { JsonCodec.tripFromJson(it) }
+                    // app / exportedAt / counts 只是给人看的，认一下或者直接跳。
+                    "app" -> stream.readString()
+                    "exportedAt" -> stream.readLong()
+                    else -> stream.skipValue()
+                }
+            }
+        } catch (e: JsonStreamException) {
+            throw BackupFormatException(describeDamage(e))
+        } catch (e: JSONException) {
+            throw BackupFormatException("备份里有字段格式不对：${e.message ?: "无法解析"}")
+        }
+
         if (schema <= 0) throw BackupFormatException("不是「朝夕」的备份文件")
         if (schema > SCHEMA_VERSION) {
             throw BackupFormatException("备份文件来自更新版本的 App（schema=$schema）")
         }
-        // 旧版本里的 "habits" 数组不再读取：习惯工具已下线，读到也无处安放。
         return BackupPayload(
-            notes = JsonCodec.notesFromJson(root.optJSONArray("notes") ?: JSONArray()),
-            records = JsonCodec.recordsFromJson(root.optJSONArray("ledger") ?: JSONArray()),
-            sessions = JsonCodec.sessionsFromJson(root.optJSONArray("tracks") ?: JSONArray()),
-            timers = JsonCodec.timerSessionsFromJson(root.optJSONArray("timers") ?: JSONArray()),
-            drinkCategories = JsonCodec.drinkCategoriesFromJson(
-                root.optJSONArray("drinkCategories") ?: JSONArray()
-            ),
-            drinkRecords = JsonCodec.drinkRecordsFromJson(
-                root.optJSONArray("drinkRecords") ?: JSONArray()
-            ),
-            trips = JsonCodec.tripsFromJson(root.optJSONArray("trips") ?: JSONArray())
+            notes = notes,
+            records = records,
+            sessions = sessions,
+            timers = timers,
+            drinkCategories = drinkCategories,
+            drinkRecords = drinkRecords,
+            trips = trips
         )
     }
+
+    private fun describeDamage(error: JsonStreamException): String =
+        "备份文件不完整或已损坏：${error.message ?: "无法解析"}"
+}
+
+/** 读一个数组，逐个元素交给 [parse]；调用时当前位置必须是 `[`。 */
+private inline fun <T> JsonStream.readElements(parse: (JSONObject) -> T): List<T> {
+    val out = ArrayList<T>()
+    beginArray()
+    while (nextElement()) {
+        val raw = readRawValue()
+        out.add(parse(JSONObject(raw)))
+    }
+    return out
 }

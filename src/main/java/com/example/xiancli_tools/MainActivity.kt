@@ -10,7 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
-import com.example.xiancli_tools.data.BackupCodec
+import com.example.xiancli_tools.data.BackupContainer
 import com.example.xiancli_tools.data.BackupPayload
 import com.example.xiancli_tools.timer.NotificationHelper
 import com.example.xiancli_tools.ui.AppRoot
@@ -46,8 +46,8 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * 解析推进来的备份。轨迹点撑起来可能有几 MB，所以放后台线程，
-     * 别让启动卡在读文件和解析上。
+     * 解析推进来的备份。轨迹点撑起来可能有几十 MB，所以放后台线程，
+     * 别让启动卡在读文件和解析上；解析是流式的，内存只占一条记录的量。
      */
     private fun consume(intent: Intent?) {
         if (intent == null) return
@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
      * 把「用其他应用打开」给的 Uri 解析成备份。
      *
      * 解析失败一律返回 null，让 App 按正常启动处理：
-     * 用户点错一个 json 文件时不该打不开应用。
+     * 用户点错一个文件时不该打不开应用。
      */
     private fun readBackup(intent: Intent?): BackupPayload? {
         if (intent == null) return null
@@ -72,9 +72,7 @@ class MainActivity : ComponentActivity() {
         }
         if (uri == null) return null
         return runCatching {
-            contentResolver.openInputStream(uri)?.use { stream ->
-                BackupCodec.decode(stream.readBytes().toString(Charsets.UTF_8))
-            }
+            contentResolver.openInputStream(uri)?.use { BackupContainer.read(it) }
         }.getOrNull()
     }
 

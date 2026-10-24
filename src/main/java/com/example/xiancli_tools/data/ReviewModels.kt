@@ -69,7 +69,7 @@ object ReviewAnalytics {
         period: ReviewPeriod,
         notes: List<Note>,
         records: List<ExpenseRecord>,
-        tracks: List<TrackSession>,
+        tracks: List<TrackBrief>,
         timers: List<TimerSession>,
         drinks: List<DrinkRecord>,
         now: Long = System.currentTimeMillis()

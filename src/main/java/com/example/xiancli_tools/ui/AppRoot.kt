@@ -15,7 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.example.xiancli_tools.data.BackupPayload
-import com.example.xiancli_tools.data.TrackSession
 
 private sealed interface Screen {
     data object Home : Screen
@@ -23,7 +22,8 @@ private sealed interface Screen {
     data object Note : Screen
     data object Ledger : Screen
     data object Track : Screen
-    data class TrackMap(val sessions: List<TrackSession>) : Screen
+    /** 只带 id：点阵由地图页自己去仓库取，别在导航状态里揣着几十万个坐标。 */
+    data class TrackMap(val sessionIds: List<Long>) : Screen
     data object Drink : Screen
     data object Trip : Screen
     data object Review : Screen
@@ -97,7 +97,7 @@ fun AppRoot(
             onOpenMap = { screen = Screen.TrackMap(it) }
         )
         is Screen.TrackMap -> TrackMapScreen(
-            sessions = current.sessions,
+            sessionIds = current.sessionIds,
             onBack = { screen = Screen.Track }
         )
         Screen.Drink -> DrinkScreen(

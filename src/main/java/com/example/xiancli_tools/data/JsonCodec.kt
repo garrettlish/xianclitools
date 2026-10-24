@@ -11,6 +11,20 @@ import org.json.JSONObject
  */
 object JsonCodec {
 
+    /** 足迹点阵的字段名。读摘要时要整段跳过它，所以单独提出来免得两处各写一遍。 */
+    internal const val FIELD_POINTS = "points"
+
+    /**
+     * 坐标只保留 6 位小数。
+     *
+     * 6 位约 0.11 米，比 GPS 本身 3–10 米的精度细得多；但从 18 位数字缩到 9 位，
+     * 单点省下约 20% 体积——点阵是备份体积的唯一大头，这一步比任何压缩都便宜。
+     */
+    private fun roundCoordinate(value: Double): Double =
+        Math.round(value * COORDINATE_SCALE) / COORDINATE_SCALE
+
+    private const val COORDINATE_SCALE = 1_000_000.0
+
     fun noteToJson(note: Note): JSONObject = JSONObject()
         .put("id", note.id)
         .put("category", note.category.name)
@@ -70,8 +84,8 @@ object JsonCodec {
         session.points.forEach { point ->
             points.put(
                 JSONArray()
-                    .put(point.latitude)
-                    .put(point.longitude)
+                    .put(roundCoordinate(point.latitude))
+                    .put(roundCoordinate(point.longitude))
                     .put(point.timeMillis)
             )
         }
@@ -81,7 +95,7 @@ object JsonCodec {
             .put("start", session.startMillis)
             .put("end", session.endMillis)
             .put("distance", session.distanceMeters)
-            .put("points", points)
+            .put(FIELD_POINTS, points)
             .put("updatedAt", session.updatedAt)
             .put("deletedAt", session.deletedAt ?: 0L)
     }
@@ -90,7 +104,7 @@ object JsonCodec {
         val mode = runCatching {
             TransportMode.valueOf(json.optString("mode", TransportMode.WALK.name))
         }.getOrDefault(TransportMode.WALK)
-        val pointsArray = json.optJSONArray("points") ?: JSONArray()
+        val pointsArray = json.optJSONArray(FIELD_POINTS) ?: JSONArray()
         val points = buildList {
             for (index in 0 until pointsArray.length()) {
                 val item = pointsArray.optJSONArray(index) ?: continue
@@ -115,8 +129,7 @@ object JsonCodec {
         )
     }
 
-    fun notesToJson(notes: List<Note>): JSONArray {
-        val array = JSONArray()
+    fun notesToJson(notes: List<Note>): JSONArray {        val array = JSONArray()
         notes.forEach { array.put(noteToJson(it)) }
         return array
     }
@@ -136,18 +149,6 @@ object JsonCodec {
     fun recordsFromJson(array: JSONArray): List<ExpenseRecord> = buildList {
         for (index in 0 until array.length()) {
             array.optJSONObject(index)?.let { add(recordFromJson(it)) }
-        }
-    }
-
-    fun sessionsToJson(sessions: List<TrackSession>): JSONArray {
-        val array = JSONArray()
-        sessions.forEach { array.put(sessionToJson(it)) }
-        return array
-    }
-
-    fun sessionsFromJson(array: JSONArray): List<TrackSession> = buildList {
-        for (index in 0 until array.length()) {
-            array.optJSONObject(index)?.let { add(sessionFromJson(it)) }
         }
     }
 

@@ -5,8 +5,7 @@ import com.example.xiancli_tools.data.ExpenseCategory
 import com.example.xiancli_tools.data.ExpenseRecord
 import com.example.xiancli_tools.data.Note
 import com.example.xiancli_tools.data.NoteCategory
-import com.example.xiancli_tools.data.TrackPoint
-import com.example.xiancli_tools.data.TrackSession
+import com.example.xiancli_tools.data.TrackBrief
 import com.example.xiancli_tools.data.TransportMode
 import com.example.xiancli_tools.data.Trip
 import com.example.xiancli_tools.data.TripAnalytics
@@ -93,21 +92,19 @@ class TripAnalyticsTest {
             record(3L, ExpenseCategory.FOOD, 9_900, at(10, 20))
         )
         val tracks = listOf(
-            TrackSession(
+            TrackBrief(
                 id = 1L,
                 mode = TransportMode.WALK,
                 startMillis = at(10, 11),
                 endMillis = at(10, 11) + 3_600_000L,
-                distanceMeters = 2_500.0,
-                points = listOf(TrackPoint(31.2, 121.4, at(10, 11)))
+                distanceMeters = 2_500.0
             ),
-            TrackSession(
+            TrackBrief(
                 id = 2L,
                 mode = TransportMode.WALK,
                 startMillis = at(10, 20),
                 endMillis = at(10, 20) + 3_600_000L,
-                distanceMeters = 9_000.0,
-                points = listOf(TrackPoint(31.2, 121.4, at(10, 20)))
+                distanceMeters = 9_000.0
             )
         )
         val notes = listOf(

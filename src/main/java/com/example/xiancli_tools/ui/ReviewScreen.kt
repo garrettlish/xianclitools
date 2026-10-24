@@ -54,7 +54,7 @@ import com.example.xiancli_tools.data.TimerSession
 import com.example.xiancli_tools.data.TimerSessionRepository
 import com.example.xiancli_tools.data.TrackAnalytics
 import com.example.xiancli_tools.data.TrackRepository
-import com.example.xiancli_tools.data.TrackSession
+import com.example.xiancli_tools.data.TrackBrief
 import com.example.xiancli_tools.ui.components.EmptyReportCard
 import com.example.xiancli_tools.ui.components.IconBadge
 import com.example.xiancli_tools.ui.components.MetricTile
@@ -86,7 +86,7 @@ fun ReviewScreen(
     var period by remember { mutableStateOf(ReviewPeriod.WEEK) }
     var notes by remember { mutableStateOf<List<Note>>(emptyList()) }
     var records by remember { mutableStateOf<List<ExpenseRecord>>(emptyList()) }
-    var sessions by remember { mutableStateOf<List<TrackSession>>(emptyList()) }
+    var sessions by remember { mutableStateOf<List<TrackBrief>>(emptyList()) }
     var timers by remember { mutableStateOf<List<TimerSession>>(emptyList()) }
     var drinks by remember { mutableStateOf<List<DrinkRecord>>(emptyList()) }
     var drinkCategories by remember { mutableStateOf<List<DrinkCategory>>(emptyList()) }
@@ -95,7 +95,7 @@ fun ReviewScreen(
         withContext(Dispatchers.IO) {
             notes = NoteRepository(context).loadNotes()
             records = LedgerRepository(context).loadRecords()
-            sessions = TrackRepository(context).loadSessions()
+            sessions = TrackRepository(context).loadSessionIndex()
             timers = TimerSessionRepository(context).loadSessions()
             val drinkRepository = DrinkRepository(context)
             drinks = drinkRepository.loadRecords()

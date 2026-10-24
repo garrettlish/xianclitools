@@ -3,7 +3,7 @@ package com.example.xiancli_tools
 import com.example.xiancli_tools.data.TrackAnalytics
 import com.example.xiancli_tools.data.TrackPeriod
 import com.example.xiancli_tools.data.TrackPoint
-import com.example.xiancli_tools.data.TrackSession
+import com.example.xiancli_tools.data.TrackBrief
 import com.example.xiancli_tools.data.TransportMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -65,16 +65,12 @@ class TrackAnalyticsTest {
         assertEquals(15, calendar.get(Calendar.DAY_OF_MONTH))
     }
 
-    private fun session(mode: TransportMode, startMillis: Long, meters: Double) = TrackSession(
+    private fun session(mode: TransportMode, startMillis: Long, meters: Double) = TrackBrief(
         id = startMillis,
         mode = mode,
         startMillis = startMillis,
         endMillis = startMillis + 30 * 60 * 1000L,
-        distanceMeters = meters,
-        points = listOf(
-            TrackPoint(39.90, 116.39, startMillis),
-            TrackPoint(39.91, 116.40, startMillis + 30 * 60 * 1000L)
-        )
+        distanceMeters = meters
     )
 
     private fun millisOf(year: Int, month: Int, day: Int, hour: Int, minute: Int): Long =
