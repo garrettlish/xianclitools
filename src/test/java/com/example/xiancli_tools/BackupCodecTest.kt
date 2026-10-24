@@ -112,13 +112,32 @@ class BackupCodecTest {
     }
 
     @Test
+    fun `旧版类别读入时映射到新类别`() {
+        // 类别精简后旧文件不用迁移：提醒并入待办，灵感、其他并入日志，
+        // 读到哪条映射哪条，保存时自然写成新名——删掉的数据不能因为映射而丢。
+        fun legacyNote(category: String) = JsonCodec.noteFromJson(
+            JSONObject()
+                .put("id", 1L)
+                .put("category", category)
+                .put("content", "旧记录")
+                .put("time", 1_700_000_000_000L)
+        )
+
+        assertEquals(NoteCategory.TODO, legacyNote("REMINDER").category)
+        assertEquals(NoteCategory.DIARY, legacyNote("IDEA").category)
+        assertEquals(NoteCategory.DIARY, legacyNote("OTHER").category)
+        // 认不出的脏值也不能让读取崩溃。
+        assertEquals(NoteCategory.DIARY, legacyNote("SOMETHING_NEW").category)
+    }
+
+    @Test
     fun `合并时对方更旧的版本不会覆盖本地`() {
         val existing = BackupPayload(notes = samplePayload().notes)
         val incoming = BackupPayload(
             notes = listOf(
                 Note(
                     id = 1000L,
-                    category = NoteCategory.OTHER,
+                    category = NoteCategory.DIARY,
                     content = "同 id 的旧内容",
                     timeMillis = 1L,
                     updatedAt = 1L

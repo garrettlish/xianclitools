@@ -13,7 +13,7 @@ class NoteAnalyticsTest {
     @Test
     fun summarize_only_counts_notes_inside_period() {
         val now = millisOf(2026, Calendar.JUNE, 15, 12, 0)
-        val today = note(NoteCategory.REMINDER, millisOf(2026, Calendar.JUNE, 15, 8, 0))
+        val today = note(NoteCategory.TODO, millisOf(2026, Calendar.JUNE, 15, 8, 0))
         val lastMonth = note(NoteCategory.DIARY, millisOf(2026, Calendar.MAY, 20, 8, 0))
 
         val day = NoteAnalytics.summarize(listOf(today, lastMonth), NotePeriod.DAY, now)
@@ -29,14 +29,14 @@ class NoteAnalyticsTest {
     @Test
     fun category_summaries_aggregate_and_sort_by_count() {
         val now = millisOf(2026, Calendar.JUNE, 15, 12, 0)
-        val reminder1 = note(NoteCategory.REMINDER, millisOf(2026, Calendar.JUNE, 15, 7, 0))
-        val reminder2 = note(NoteCategory.REMINDER, millisOf(2026, Calendar.JUNE, 15, 9, 0))
+        val todo1 = note(NoteCategory.TODO, millisOf(2026, Calendar.JUNE, 15, 7, 0))
+        val todo2 = note(NoteCategory.TODO, millisOf(2026, Calendar.JUNE, 15, 9, 0))
         val mood = note(NoteCategory.MOOD, millisOf(2026, Calendar.JUNE, 15, 10, 0))
 
-        val day = NoteAnalytics.summarize(listOf(reminder1, reminder2, mood), NotePeriod.DAY, now)
+        val day = NoteAnalytics.summarize(listOf(todo1, todo2, mood), NotePeriod.DAY, now)
 
         assertEquals(2, day.categoryCount)
-        assertEquals(NoteCategory.REMINDER, day.topCategory?.category)
+        assertEquals(NoteCategory.TODO, day.topCategory?.category)
         assertEquals(2, day.topCategory?.count)
 
         val moodSummary = day.categorySummaries.first { it.category == NoteCategory.MOOD }
@@ -46,7 +46,7 @@ class NoteAnalyticsTest {
     @Test
     fun week_trend_places_note_on_weekday_bucket() {
         val now = millisOf(2026, Calendar.JUNE, 17, 12, 0)
-        val wednesday = note(NoteCategory.IDEA, millisOf(2026, Calendar.JUNE, 17, 9, 0))
+        val wednesday = note(NoteCategory.DIARY, millisOf(2026, Calendar.JUNE, 17, 9, 0))
 
         val summary = NoteAnalytics.summarize(listOf(wednesday), NotePeriod.WEEK, now)
         val trend = NoteAnalytics.trend(summary)
@@ -61,7 +61,7 @@ class NoteAnalyticsTest {
     fun year_trend_has_twelve_monthly_buckets() {
         val now = millisOf(2026, Calendar.JUNE, 17, 12, 0)
         val june = note(NoteCategory.TODO, millisOf(2026, Calendar.JUNE, 5, 9, 0))
-        val march = note(NoteCategory.OTHER, millisOf(2026, Calendar.MARCH, 5, 9, 0))
+        val march = note(NoteCategory.DIARY, millisOf(2026, Calendar.MARCH, 5, 9, 0))
 
         val summary = NoteAnalytics.summarize(listOf(june, march), NotePeriod.YEAR, now)
         val trend = NoteAnalytics.trend(summary)

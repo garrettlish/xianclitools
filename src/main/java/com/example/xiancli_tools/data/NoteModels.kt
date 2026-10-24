@@ -3,19 +3,20 @@ package com.example.xiancli_tools.data
 import java.util.Calendar
 import java.util.Locale
 
+/**
+ * 备忘的三个类型。旧的「提醒」并入待办、「灵感」「其他」并入日志，
+ * 旧数据里的历史类别名在 [JsonCodec] 读取时映射过来。
+ */
 enum class NoteCategory(val label: String) {
-    REMINDER("提醒"),
     TODO("待办"),
     DIARY("日志"),
-    MOOD("心情"),
-    IDEA("灵感"),
-    OTHER("其他")
+    MOOD("心情")
 }
 
 /**
  * 一条备忘。
  *
- * - [remindAt]：到点提醒的时间；null 表示不提醒。只有「提醒」「待办」两类会用到。
+ * - [remindAt]：到点提醒的时间；null 表示不提醒。只有「待办」会用到。
  * - [done]：待办是否已勾掉。其他类型也可以勾，语义是「这件事处理完了」。
  * - [moodLevel]：心情等级 1..5（1 低落、5 很好），只有「心情」类会用到。
  */

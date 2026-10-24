@@ -112,7 +112,7 @@ fun NoteScreen(onBack: () -> Unit) {
     // 统计默认落在当月（而不是今天），进门就能看到整月的记录。
     var period by remember { mutableStateOf(NotePeriod.MONTH) }
     var customRange by remember { mutableStateOf(DateRanges.lastDays()) }
-    var selectedCategory by remember { mutableStateOf(NoteCategory.REMINDER) }
+    var selectedCategory by remember { mutableStateOf(NoteCategory.TODO) }
     var content by remember { mutableStateOf("") }
     var entryTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var editingId by remember { mutableStateOf<Long?>(null) }
@@ -142,7 +142,7 @@ fun NoteScreen(onBack: () -> Unit) {
 
     fun resetEditor() {
         editingId = null
-        selectedCategory = NoteCategory.REMINDER
+        selectedCategory = NoteCategory.TODO
         content = ""
         entryTime = System.currentTimeMillis()
         remindAt = null
@@ -446,8 +446,8 @@ private fun QuickAddCard(
     onCancelEdit: () -> Unit,
     onSave: () -> Unit
 ) {
-    // 「提醒」「待办」才需要闹钟；心情才需要档位。其余类型保持界面干净。
-    val needsReminder = selectedCategory == NoteCategory.REMINDER || selectedCategory == NoteCategory.TODO
+    // 只有「待办」才需要闹钟；心情才需要档位。其余类型保持界面干净。
+    val needsReminder = selectedCategory == NoteCategory.TODO
 
     SectionCard {
         CategoryGrid(selected = selectedCategory, onSelect = onSelectCategory)
@@ -740,10 +740,10 @@ private fun ReportContent(
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TotalsCard(summary)
+        CategoryBreakdownCard(summary)
+        TrendCard(summary, trend)
         // 日历吃全量数据：切到「日」时也想看到整月的心情分布。
         MoodCalendarCard(notes = allNotes, accent = NoteAccent)
-        TrendCard(summary, trend)
-        CategoryBreakdownCard(summary)
     }
 }
 

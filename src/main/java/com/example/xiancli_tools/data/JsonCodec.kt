@@ -36,10 +36,20 @@ object JsonCodec {
         .put("updatedAt", note.updatedAt)
         .put("deletedAt", note.deletedAt ?: 0L)
 
+    /**
+     * 旧版类别名映射：提醒并入待办，灵感、其他（以及认不出的脏值）并入日志。
+     * 本地旧文件和旧备份都不用迁移——读到哪条映射哪条，保存时自然写成新名。
+     */
+    private fun noteCategoryFrom(raw: String): NoteCategory = when (raw) {
+        NoteCategory.TODO.name -> NoteCategory.TODO
+        NoteCategory.DIARY.name -> NoteCategory.DIARY
+        NoteCategory.MOOD.name -> NoteCategory.MOOD
+        "REMINDER" -> NoteCategory.TODO
+        else -> NoteCategory.DIARY
+    }
+
     fun noteFromJson(json: JSONObject): Note {
-        val category = runCatching {
-            NoteCategory.valueOf(json.optString("category", NoteCategory.OTHER.name))
-        }.getOrDefault(NoteCategory.OTHER)
+        val category = noteCategoryFrom(json.optString("category", NoteCategory.DIARY.name))
         return Note(
             id = json.optLong("id"),
             category = category,
