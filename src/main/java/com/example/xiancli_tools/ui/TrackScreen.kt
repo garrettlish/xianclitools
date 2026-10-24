@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.xiancli_tools.R
+import com.example.xiancli_tools.data.DateRange
 import com.example.xiancli_tools.data.DateRanges
 import com.example.xiancli_tools.data.PeriodSummary
 import com.example.xiancli_tools.data.TrackAnalytics
@@ -87,9 +88,10 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
-/** 足迹页的两块内容：记录与统计。 */
+/** 足迹页的三块内容：记录、明细与统计。 */
 private enum class TrackTab(val label: String) {
     RECORD("记录"),
+    DETAIL("明细"),
     REPORT("统计")
 }
 
@@ -108,13 +110,15 @@ fun TrackScreen(
     var tab by remember { mutableStateOf(TrackTab.RECORD) }
     var sessions by remember { mutableStateOf<List<TrackSession>>(emptyList()) }
     var selectedMode by remember { mutableStateOf(TransportMode.WALK) }
-    var period by remember { mutableStateOf(TrackPeriod.DAY) }
+    // 统计默认落在当月（而不是今天），进门就能看到整月的轨迹。
+    var period by remember { mutableStateOf(TrackPeriod.MONTH) }
     var customRange by remember { mutableStateOf(DateRanges.lastDays()) }
     var elapsed by remember { mutableLongStateOf(0L) }
     var pendingMode by remember { mutableStateOf<TransportMode?>(null) }
     var pendingDelete by remember { mutableStateOf<TrackSession?>(null) }
 
     val recordScroll = rememberScrollState()
+    val detailScroll = rememberScrollState()
     val reportScroll = rememberScrollState()
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -290,6 +294,28 @@ fun TrackScreen(
                     }
                 }
 
+                TrackTab.DETAIL -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(detailScroll)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 24.dp)
+                ) {
+                    PeriodSelector(
+                        period = period,
+                        onSelect = { period = it },
+                        customRange = customRange,
+                        onPickStart = { pickRangeStart() },
+                        onPickEnd = { pickRangeEnd() }
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    TrackDetailList(
+                        summary = summary,
+                        onOpenMap = onOpenMap,
+                        onDelete = { pendingDelete = it }
+                    )
+                }
+
                 TrackTab.REPORT -> Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -297,32 +323,15 @@ fun TrackScreen(
                         .padding(horizontal = 16.dp)
                         .padding(bottom = 24.dp)
                 ) {
-                    SegmentedTabs(
-                        labels = TrackPeriod.entries.map { it.label },
-                        selectedIndex = period.ordinal,
-                        onSelect = { period = TrackPeriod.entries[it] }
+                    PeriodSelector(
+                        period = period,
+                        onSelect = { period = it },
+                        customRange = customRange,
+                        onPickStart = { pickRangeStart() },
+                        onPickEnd = { pickRangeEnd() }
                     )
-                    if (period == TrackPeriod.CUSTOM) {
-                        Spacer(Modifier.height(8.dp))
-                        CustomRangeBar(
-                            range = customRange,
-                            accent = TrackAccent,
-                            onPickStart = { pickRangeStart() },
-                            onPickEnd = { pickRangeEnd() }
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "共 ${customRange.dayCount} 天",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                     Spacer(Modifier.height(12.dp))
-                    SummaryContent(
-                        summary = summary,
-                        onOpenMap = onOpenMap,
-                        onDelete = { pendingDelete = it }
-                    )
+                    SummaryContent(summary = summary)
                 }
             }
         }
@@ -505,12 +514,39 @@ private fun ActiveRecordingCard(
     }
 }
 
+/** 「日 / 周 / 月 / 年 / 自定义」周期切换：明细与统计两个标签共用同一份选择。 */
 @Composable
-private fun SummaryContent(
-    summary: PeriodSummary,
-    onOpenMap: (List<TrackSession>) -> Unit,
-    onDelete: (TrackSession) -> Unit
+private fun PeriodSelector(
+    period: TrackPeriod,
+    onSelect: (TrackPeriod) -> Unit,
+    customRange: DateRange,
+    onPickStart: () -> Unit,
+    onPickEnd: () -> Unit
 ) {
+    SegmentedTabs(
+        labels = TrackPeriod.entries.map { it.label },
+        selectedIndex = period.ordinal,
+        onSelect = { onSelect(TrackPeriod.entries[it]) }
+    )
+    if (period == TrackPeriod.CUSTOM) {
+        Spacer(Modifier.height(8.dp))
+        CustomRangeBar(
+            range = customRange,
+            accent = TrackAccent,
+            onPickStart = onPickStart,
+            onPickEnd = onPickEnd
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "共 ${customRange.dayCount} 天",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun SummaryContent(summary: PeriodSummary) {
     if (summary.sessions.isEmpty()) {
         EmptyReportCard(
             icon = R.drawable.ic_tool_route,
@@ -523,7 +559,6 @@ private fun SummaryContent(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TotalsCard(summary)
         ModeBreakdownCard(summary)
-        SessionListCard(summary, onOpenMap, onDelete)
     }
 }
 
@@ -673,23 +708,42 @@ private fun ModeBreakdownCard(summary: PeriodSummary) {
 }
 
 @Composable
-private fun SessionListCard(
+private fun TrackDetailList(
     summary: PeriodSummary,
     onOpenMap: (List<TrackSession>) -> Unit,
     onDelete: (TrackSession) -> Unit
 ) {
-    SectionCard(title = "轨迹明细") {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            summary.sessions.forEach { session ->
-                SessionRow(
-                    session = session,
-                    period = summary.period,
-                    onClick = { onOpenMap(listOf(session)) },
-                    onDelete = { onDelete(session) }
-                )
+    if (summary.sessions.isEmpty()) {
+        EmptyReportCard(
+            icon = R.drawable.ic_tool_route,
+            text = "${summary.rangeName}还没有轨迹记录",
+            accent = TrackAccent
+        )
+        return
+    }
+
+    // 明细按自然日分组，标题给出当天的里程与次数，正好对上「今天走了多少」的直觉。
+    val grouped = summary.sessions.groupBy { DateRanges.dayKey(it.startMillis) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        grouped.forEach { (_, daySessions) ->
+            val heading = DateRanges.formatDayHeading(daySessions.first().startMillis)
+            val dayDistance = daySessions.sumOf { it.distanceMeters }
+            SectionCard(
+                title = "$heading · ${TrackAnalytics.formatDistance(dayDistance)} · " +
+                    "${daySessions.size} 次"
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    daySessions.forEach { session ->
+                        SessionRow(
+                            session = session,
+                            timeText = formatClock(session.startMillis),
+                            onClick = { onOpenMap(listOf(session)) },
+                            onDelete = { onDelete(session) }
+                        )
+                    }
+                }
             }
         }
-        Spacer(Modifier.height(12.dp))
         OutlinedButton(
             onClick = { onOpenMap(summary.sessions) },
             modifier = Modifier.fillMaxWidth()
@@ -708,7 +762,7 @@ private fun SessionListCard(
 @Composable
 private fun SessionRow(
     session: TrackSession,
-    period: TrackPeriod,
+    timeText: String,
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -729,7 +783,7 @@ private fun SessionRow(
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "${session.mode.label} · ${formatSessionTime(session.startMillis, period)}",
+                text = "${session.mode.label} · $timeText",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold
             )
@@ -766,3 +820,7 @@ private fun formatSessionTime(startMillis: Long, period: TrackPeriod): String {
     }
     return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(startMillis))
 }
+
+/** 明细按天分组后，行内只需要时分——日期已经写在分组标题上了。 */
+private fun formatClock(millis: Long): String =
+    SimpleDateFormat("HH:mm", Locale.CHINA).format(Date(millis))

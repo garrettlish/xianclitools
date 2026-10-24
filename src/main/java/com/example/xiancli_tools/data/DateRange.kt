@@ -120,6 +120,31 @@ object DateRanges {
     fun formatDay(millis: Long): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(millis))
 
+    /** 明细按天分组的分组键（同一天落到同一个 key）。 */
+    fun dayKey(millis: Long): String =
+        SimpleDateFormat("yyyyMMdd", Locale.CHINA).format(Date(millis))
+
+    /**
+     * 明细分组的标题：今天 / 昨天 / 10月24日 星期六。
+     * 跨年时补上年份，避免翻旧账时分不清哪一年。
+     */
+    fun formatDayHeading(millis: Long, now: Long = System.currentTimeMillis()): String {
+        val day = startOfDay(millis)
+        val today = startOfDay(now)
+        return when (day) {
+            today -> "今天"
+            plusDays(today, -1) -> "昨天"
+            else -> {
+                val thisYear = Calendar.getInstance().apply { timeInMillis = today }
+                    .get(Calendar.YEAR)
+                val thatYear = Calendar.getInstance().apply { timeInMillis = day }
+                    .get(Calendar.YEAR)
+                val pattern = if (thisYear == thatYear) "M月d日 EEEE" else "yyyy年M月d日 EEEE"
+                SimpleDateFormat(pattern, Locale.CHINA).format(Date(day))
+            }
+        }
+    }
+
     /** 例如 2026年10月17日 – 10月23日，用于报表标题。 */
     fun formatHeading(range: DateRange): String {
         val start = Calendar.getInstance().apply { timeInMillis = range.startMillis }

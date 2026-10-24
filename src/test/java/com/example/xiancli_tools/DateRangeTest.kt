@@ -144,6 +144,30 @@ class DateRangeTest {
         assertEquals("单日最高", summary.peakLabel)
     }
 
+    @Test
+    fun day_key_groups_a_whole_natural_day_and_splits_neighbours() {
+        val morning = millisOf(2026, Calendar.JUNE, 15, 0, 0)
+        val night = millisOf(2026, Calendar.JUNE, 15, 23, 59)
+        val nextDay = millisOf(2026, Calendar.JUNE, 16, 0, 0)
+
+        assertEquals(DateRanges.dayKey(morning), DateRanges.dayKey(night))
+        assertTrue(DateRanges.dayKey(morning) != DateRanges.dayKey(nextDay))
+    }
+
+    @Test
+    fun day_heading_says_today_and_yesterday_then_falls_back_to_date() {
+        val now = millisOf(2026, Calendar.JUNE, 15, 18, 0)
+
+        assertEquals("今天", DateRanges.formatDayHeading(millisOf(2026, Calendar.JUNE, 15, 2, 0), now))
+        assertEquals("昨天", DateRanges.formatDayHeading(millisOf(2026, Calendar.JUNE, 14, 23, 0), now))
+
+        val older = DateRanges.formatDayHeading(millisOf(2026, Calendar.JUNE, 10, 9, 0), now)
+        assertTrue(older.startsWith("6月10日"))
+        // 跨年时补上年份，避免翻旧账时分不清哪一年
+        val lastYear = DateRanges.formatDayHeading(millisOf(2025, Calendar.DECEMBER, 31, 9, 0), now)
+        assertTrue(lastYear.startsWith("2025年12月31日"))
+    }
+
     private fun record(timeMillis: Long) = ExpenseRecord(
         id = timeMillis,
         category = ExpenseCategory.FOOD,

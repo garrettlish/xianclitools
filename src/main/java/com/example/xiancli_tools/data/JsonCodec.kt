@@ -16,6 +16,9 @@ object JsonCodec {
         .put("category", note.category.name)
         .put("content", note.content)
         .put("time", note.timeMillis)
+        .put("remindAt", note.remindAt ?: 0L)
+        .put("done", note.done)
+        .put("mood", note.moodLevel ?: 0)
 
     fun noteFromJson(json: JSONObject): Note {
         val category = runCatching {
@@ -25,7 +28,11 @@ object JsonCodec {
             id = json.optLong("id"),
             category = category,
             content = json.optString("content"),
-            timeMillis = json.optLong("time")
+            timeMillis = json.optLong("time"),
+            // schema 1 的备份文件没有这三个字段，opt 系列会给出默认值，正好兼容。
+            remindAt = json.optLong("remindAt", 0L).takeIf { it > 0L },
+            done = json.optBoolean("done", false),
+            moodLevel = MoodLevels.sanitize(json.optInt("mood", 0))
         )
     }
 
@@ -128,6 +135,112 @@ object JsonCodec {
     fun sessionsFromJson(array: JSONArray): List<TrackSession> = buildList {
         for (index in 0 until array.length()) {
             array.optJSONObject(index)?.let { add(sessionFromJson(it)) }
+        }
+    }
+
+    // ---- 专注记录 ----
+
+    fun timerSessionToJson(session: TimerSession): JSONObject = JSONObject()
+        .put("id", session.id)
+        .put("label", session.label)
+        .put("planned", session.plannedMillis)
+        .put("start", session.startMillis)
+        .put("end", session.endMillis)
+        .put("completed", session.completed)
+
+    fun timerSessionFromJson(json: JSONObject): TimerSession = TimerSession(
+        id = json.optLong("id"),
+        label = json.optString("label", "定时"),
+        plannedMillis = json.optLong("planned"),
+        startMillis = json.optLong("start"),
+        endMillis = json.optLong("end"),
+        completed = json.optBoolean("completed", false)
+    )
+
+    fun timerSessionsToJson(sessions: List<TimerSession>): JSONArray {
+        val array = JSONArray()
+        sessions.forEach { array.put(timerSessionToJson(it)) }
+        return array
+    }
+
+    fun timerSessionsFromJson(array: JSONArray): List<TimerSession> = buildList {
+        for (index in 0 until array.length()) {
+            array.optJSONObject(index)?.let { add(timerSessionFromJson(it)) }
+        }
+    }
+
+    // ---- 习惯 ----
+
+    fun habitToJson(habit: Habit): JSONObject {
+        val days = JSONArray()
+        habit.checkInDays.forEach { days.put(it) }
+        return JSONObject()
+            .put("id", habit.id)
+            .put("name", habit.name)
+            .put("icon", habit.iconKey)
+            .put("created", habit.createdMillis)
+            .put("days", days)
+            .put("reminder", habit.reminderMinuteOfDay ?: -1)
+            .put("archived", habit.archived)
+    }
+
+    fun habitFromJson(json: JSONObject): Habit {
+        val daysArray = json.optJSONArray("days") ?: JSONArray()
+        val days = buildList {
+            for (index in 0 until daysArray.length()) {
+                val value = daysArray.optString(index)
+                if (value.isNotBlank()) add(value)
+            }
+        }
+        return Habit(
+            id = json.optLong("id"),
+            name = json.optString("name"),
+            iconKey = json.optString("icon", "custom"),
+            createdMillis = json.optLong("created"),
+            checkInDays = days.distinct().sortedDescending(),
+            reminderMinuteOfDay = json.optInt("reminder", -1).takeIf { it in 0..1439 },
+            archived = json.optBoolean("archived", false)
+        )
+    }
+
+    fun habitsToJson(habits: List<Habit>): JSONArray {
+        val array = JSONArray()
+        habits.forEach { array.put(habitToJson(it)) }
+        return array
+    }
+
+    fun habitsFromJson(array: JSONArray): List<Habit> = buildList {
+        for (index in 0 until array.length()) {
+            array.optJSONObject(index)?.let { add(habitFromJson(it)) }
+        }
+    }
+
+    // ---- 出行 ----
+
+    fun tripToJson(trip: Trip): JSONObject = JSONObject()
+        .put("id", trip.id)
+        .put("name", trip.name)
+        .put("start", trip.startMillis)
+        .put("end", trip.endMillis)
+        .put("note", trip.note)
+
+    fun tripFromJson(json: JSONObject): Trip = Trip(
+        id = json.optLong("id"),
+        name = json.optString("name"),
+        startMillis = json.optLong("start"),
+        endMillis = json.optLong("end"),
+        note = json.optString("note")
+    )
+
+    fun tripsToJson(trips: List<Trip>): JSONArray {
+        val array = JSONArray()
+        trips.forEach { array.put(tripToJson(it)) }
+        return array
+    }
+
+    fun tripsFromJson(array: JSONArray): List<Trip> = buildList {
+        for (index in 0 until array.length()) {
+            array.optJSONObject(index)?.let { add(tripFromJson(it)) }
         }
     }
 }

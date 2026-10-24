@@ -28,6 +28,22 @@ class SettingsRepository(context: Context) {
         get() = prefs.getString(KEY_SCHEDULED_LABEL, null)
         set(value) = prefs.edit().putString(KEY_SCHEDULED_LABEL, value).apply()
 
+    /**
+     * 正在进行的那次计时。存在这里而不是内存里，是因为闹钟到点时
+     * App 可能已经被系统杀掉了，接收器只能从持久化状态里把它捡回来。
+     */
+    var activeSessionStart: Long
+        get() = prefs.getLong(KEY_ACTIVE_START, 0L)
+        set(value) = prefs.edit().putLong(KEY_ACTIVE_START, value).apply()
+
+    var activeSessionPlanned: Long
+        get() = prefs.getLong(KEY_ACTIVE_PLANNED, 0L)
+        set(value) = prefs.edit().putLong(KEY_ACTIVE_PLANNED, value).apply()
+
+    var activeSessionLabel: String?
+        get() = prefs.getString(KEY_ACTIVE_LABEL, null)
+        set(value) = prefs.edit().putString(KEY_ACTIVE_LABEL, value).apply()
+
     private companion object {
         const val PREFS_NAME = "xiancli_tools_settings"
         const val KEY_VIBRATION = "vibration_enabled"
@@ -35,6 +51,9 @@ class SettingsRepository(context: Context) {
         const val KEY_RINGTONE_TITLE = "ringtone_title"
         const val KEY_SCHEDULED_END_AT = "scheduled_end_at"
         const val KEY_SCHEDULED_LABEL = "scheduled_label"
+        const val KEY_ACTIVE_START = "active_session_start"
+        const val KEY_ACTIVE_PLANNED = "active_session_planned"
+        const val KEY_ACTIVE_LABEL = "active_session_label"
         const val DEFAULT_VIBRATION = true
     }
 }

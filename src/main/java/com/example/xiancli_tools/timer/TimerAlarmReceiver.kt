@@ -13,6 +13,9 @@ class TimerAlarmReceiver : BroadcastReceiver() {
         if (intent.action != ACTION_FIRE) return
         val label = intent.getStringExtra(TimerScheduler.EXTRA_LABEL) ?: "定时"
 
+        // 先结算这次计时（闹钟真的响了 = 完成），再清状态、起响铃服务。
+        TimerSessionRecorder.finish(context, completed = true)
+
         SettingsRepository(context).apply {
             scheduledEndAt = 0L
             scheduledLabel = null

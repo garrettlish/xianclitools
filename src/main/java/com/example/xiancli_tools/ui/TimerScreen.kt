@@ -55,18 +55,41 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
+import com.example.xiancli_tools.data.DateRange
+import com.example.xiancli_tools.data.DateRanges
+import com.example.xiancli_tools.data.FocusSummary
 import com.example.xiancli_tools.data.RingtoneResolver
 import com.example.xiancli_tools.data.SettingsRepository
+import com.example.xiancli_tools.data.TimerAnalytics
+import com.example.xiancli_tools.data.TimerPeriod
+import com.example.xiancli_tools.data.TimerSession
+import com.example.xiancli_tools.data.TimerSessionRepository
 import com.example.xiancli_tools.timer.TimerScheduler
+import com.example.xiancli_tools.ui.components.BarChart
+import com.example.xiancli_tools.ui.components.BarDatum
+import com.example.xiancli_tools.ui.components.ConfirmDeleteDialog
+import com.example.xiancli_tools.ui.components.CustomRangeBar
+import com.example.xiancli_tools.ui.components.EmptyReportCard
 import com.example.xiancli_tools.ui.components.IconBadge
+import com.example.xiancli_tools.ui.components.MetricTile
+import com.example.xiancli_tools.ui.components.SectionCard
+import com.example.xiancli_tools.ui.components.SegmentedTabs
+import com.example.xiancli_tools.ui.components.showDatePicker
+import com.example.xiancli_tools.ui.theme.ClayRed
 import com.example.xiancli_tools.ui.theme.MutedTeal
 import com.example.xiancli_tools.ui.theme.NoteAccent
 import com.example.xiancli_tools.ui.theme.StatsAccent
 import com.example.xiancli_tools.ui.theme.TimerAccent
+import com.example.xiancli_tools.ui.theme.WarmGray
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private data class TimerOption(
     val label: String,
@@ -84,6 +107,13 @@ private val timerOptions = listOf(
     TimerOption("自定义", 0, "自由设置", MutedTeal, R.drawable.ic_add, custom = true)
 )
 
+/** 计时页的三块内容：开始计时、明细与统计。 */
+private enum class TimerTab(val label: String) {
+    QUICK("计时"),
+    DETAIL("明细"),
+    REPORT("统计")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimerScreen(
@@ -95,10 +125,33 @@ fun TimerScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    var tab by remember { mutableStateOf(TimerTab.QUICK) }
     var endAt by remember { mutableLongStateOf(repository.scheduledEndAt) }
     var activeLabel by remember { mutableStateOf(repository.scheduledLabel) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showCustomDialog by remember { mutableStateOf(false) }
+
+    val sessionRepository = remember { TimerSessionRepository(context) }
+    var sessions by remember { mutableStateOf<List<TimerSession>>(emptyList()) }
+    val reloadSessions: () -> Unit = {
+        scope.launch {
+            sessions = withContext(Dispatchers.IO) { sessionRepository.loadSessions() }
+        }
+    }
+    LaunchedEffect(Unit) { reloadSessions() }
+
+    // 明细与统计共用一份周期选择；计时记录比较稀，默认看本周比看今天有用。
+    var period by remember { mutableStateOf(TimerPeriod.WEEK) }
+    var customRange by remember { mutableStateOf(DateRanges.lastDays()) }
+    var pendingDelete by remember { mutableStateOf<TimerSession?>(null) }
+
+    val summary = remember(sessions, period, customRange) {
+        TimerAnalytics.summarize(sessions, period, customRange = customRange)
+    }
+
+    val quickScroll = rememberScrollState()
+    val detailScroll = rememberScrollState()
+    val reportScroll = rememberScrollState()
 
     val scheduleDuration: (Long, String) -> Unit = { millis, label ->
         TimerScheduler.schedule(context, millis, label)
@@ -125,6 +178,8 @@ fun TimerScreen(
             if (now >= endAt) {
                 endAt = 0L
                 activeLabel = null
+                // 计时自然走完时记录刚落库，顺手刷新一下明细和统计。
+                reloadSessions()
                 break
             }
             delay(500)
@@ -133,6 +188,26 @@ fun TimerScreen(
 
     val vibrationEnabled = repository.vibrationEnabled
     val ringtoneTitle = RingtoneResolver.resolveTitle(context, repository)
+
+    fun deleteSession(session: TimerSession) {
+        scope.launch {
+            withContext(Dispatchers.IO) { sessionRepository.deleteSession(session.id) }
+            sessions = withContext(Dispatchers.IO) { sessionRepository.loadSessions() }
+            snackbarHostState.showSnackbar("已删除这条记录")
+        }
+    }
+
+    fun pickRangeStart() {
+        showDatePicker(context, customRange.startMillis) { picked ->
+            customRange = DateRanges.ofDays(picked, maxOf(picked, customRange.lastDayMillis))
+        }
+    }
+
+    fun pickRangeEnd() {
+        showDatePicker(context, customRange.lastDayMillis) { picked ->
+            customRange = DateRanges.ofDays(minOf(picked, customRange.startMillis), picked)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -165,88 +240,158 @@ fun TimerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp)
         ) {
-            if (!exactAllowed) {
-                ExactAlarmBanner(
-                    onEnable = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            exactAlarmLauncher.launch(
-                                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                    data = android.net.Uri.parse("package:${context.packageName}")
-                                }
-                            )
-                        }
-                    }
-                )
-                Spacer(Modifier.height(12.dp))
-            }
-
-            if (endAt > 0L) {
-                ActiveTimerCard(
-                    label = activeLabel ?: "定时",
-                    remainingMillis = (endAt - now).coerceAtLeast(0L),
-                    onCancel = {
-                        TimerScheduler.cancel(context)
-                        endAt = 0L
-                        activeLabel = null
-                        scope.launch { snackbarHostState.showSnackbar("已取消定时") }
-                    }
-                )
-                Spacer(Modifier.height(20.dp))
-            }
-
-            Text(
-                text = "选择定时时长",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+            SegmentedTabs(
+                labels = TimerTab.entries.map { it.label },
+                selectedIndex = tab.ordinal,
+                onSelect = { tab = TimerTab.entries[it] },
+                accent = TimerAccent,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 4.dp, bottom = 12.dp)
             )
-            Spacer(Modifier.height(12.dp))
 
-            timerOptions.chunked(2).forEach { rowOptions ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+            when (tab) {
+                TimerTab.QUICK -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(quickScroll)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 24.dp)
                 ) {
-                    rowOptions.forEach { option ->
-                        DurationCard(
-                            option = option,
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                if (option.custom) {
-                                    showCustomDialog = true
-                                } else {
-                                    scheduleDuration(option.minutes * 60_000L, option.label)
+                    if (!exactAllowed) {
+                        ExactAlarmBanner(
+                            onEnable = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                    exactAlarmLauncher.launch(
+                                        Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                            data = android.net.Uri.parse("package:${context.packageName}")
+                                        }
+                                    )
                                 }
                             }
                         )
+                        Spacer(Modifier.height(12.dp))
                     }
-                    if (rowOptions.size == 1) {
-                        Spacer(Modifier.weight(1f))
+
+                    if (endAt > 0L) {
+                        ActiveTimerCard(
+                            label = activeLabel ?: "定时",
+                            remainingMillis = (endAt - now).coerceAtLeast(0L),
+                            onCancel = {
+                                TimerScheduler.cancel(context)
+                                endAt = 0L
+                                activeLabel = null
+                                reloadSessions()
+                                scope.launch { snackbarHostState.showSnackbar("已取消定时") }
+                            }
+                        )
+                        Spacer(Modifier.height(20.dp))
+                    }
+
+                    Text(
+                        text = "选择定时时长",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    timerOptions.chunked(2).forEach { rowOptions ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowOptions.forEach { option ->
+                                DurationCard(
+                                    option = option,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        if (option.custom) {
+                                            showCustomDialog = true
+                                        } else {
+                                            scheduleDuration(option.minutes * 60_000L, option.label)
+                                        }
+                                    }
+                                )
+                            }
+                            if (rowOptions.size == 1) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    NotificationMethodCard(
+                        vibrationEnabled = vibrationEnabled,
+                        ringtoneTitle = ringtoneTitle,
+                        onConfigure = onOpenSettings
+                    )
+
+                    if (showCustomDialog) {
+                        CustomDurationDialog(
+                            onDismiss = { showCustomDialog = false },
+                            onConfirm = { millis, label ->
+                                showCustomDialog = false
+                                scheduleDuration(millis, label)
+                            }
+                        )
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-            }
 
-            Spacer(Modifier.height(12.dp))
-            NotificationMethodCard(
-                vibrationEnabled = vibrationEnabled,
-                ringtoneTitle = ringtoneTitle,
-                onConfigure = onOpenSettings
-            )
+                TimerTab.DETAIL -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(detailScroll)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 24.dp)
+                ) {
+                    PeriodSelector(
+                        period = period,
+                        onSelect = { period = it },
+                        customRange = customRange,
+                        onPickStart = { pickRangeStart() },
+                        onPickEnd = { pickRangeEnd() }
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    SessionDetailList(
+                        summary = summary,
+                        onDelete = { pendingDelete = it }
+                    )
+                }
 
-            if (showCustomDialog) {
-                CustomDurationDialog(
-                    onDismiss = { showCustomDialog = false },
-                    onConfirm = { millis, label ->
-                        showCustomDialog = false
-                        scheduleDuration(millis, label)
-                    }
-                )
+                TimerTab.REPORT -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(reportScroll)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 24.dp)
+                ) {
+                    PeriodSelector(
+                        period = period,
+                        onSelect = { period = it },
+                        customRange = customRange,
+                        onPickStart = { pickRangeStart() },
+                        onPickEnd = { pickRangeEnd() }
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    ReportContent(summary = summary)
+                }
             }
         }
+    }
+
+    pendingDelete?.let { session ->
+        val start = formatClock(session.startMillis)
+        ConfirmDeleteDialog(
+            title = "删除专注记录",
+            message = "确定删除「${session.label} · $start」这条记录吗？删除后无法恢复。",
+            onConfirm = {
+                deleteSession(session)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null }
+        )
     }
 }
 
@@ -340,6 +485,271 @@ private fun ActiveTimerCard(
             }
         }
     }
+}
+
+/** 「日 / 周 / 月 / 年 / 自定义」周期切换：明细与统计两个标签共用同一份选择。 */
+@Composable
+private fun PeriodSelector(
+    period: TimerPeriod,
+    onSelect: (TimerPeriod) -> Unit,
+    customRange: DateRange,
+    onPickStart: () -> Unit,
+    onPickEnd: () -> Unit
+) {
+    SegmentedTabs(
+        labels = TimerPeriod.entries.map { it.label },
+        selectedIndex = period.ordinal,
+        onSelect = { onSelect(TimerPeriod.entries[it]) }
+    )
+    if (period == TimerPeriod.CUSTOM) {
+        Spacer(Modifier.height(8.dp))
+        CustomRangeBar(
+            range = customRange,
+            accent = TimerAccent,
+            onPickStart = onPickStart,
+            onPickEnd = onPickEnd
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "共 ${customRange.dayCount} 天",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun SessionDetailList(
+    summary: FocusSummary,
+    onDelete: (TimerSession) -> Unit
+) {
+    if (summary.sessions.isEmpty()) {
+        EmptyReportCard(
+            icon = R.drawable.ic_tool_timer,
+            text = "${summary.rangeName}还没有专注记录",
+            accent = TimerAccent
+        )
+        return
+    }
+
+    // 和账本、备忘一样按自然日分组，标题带上当天总时长，不用自己一条条加。
+    val grouped = summary.sessions.groupBy { DateRanges.dayKey(it.startMillis) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        grouped.forEach { (_, daySessions) ->
+            val heading = DateRanges.formatDayHeading(daySessions.first().startMillis)
+            val dayTotal = daySessions.sumOf { it.focusMillis }
+            SectionCard(title = "$heading · ${TimerAnalytics.formatCompact(dayTotal)}") {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    daySessions.forEach { session ->
+                        SessionRow(
+                            session = session,
+                            onDelete = { onDelete(session) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionRow(
+    session: TimerSession,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconBadge(
+            icon = R.drawable.ic_tool_timer,
+            tint = if (session.completed) TimerAccent else WarmGray,
+            container = (if (session.completed) TimerAccent else WarmGray).copy(alpha = 0.14f),
+            size = 40.dp,
+            iconSize = 22.dp
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = session.label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "${formatClock(session.startMillis)} – ${formatClock(session.endMillis)}" +
+                    " · " + if (session.completed) "已完成" else "中断",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (session.completed) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    ClayRed
+                }
+            )
+        }
+        Text(
+            text = TimerAnalytics.formatCompact(session.focusMillis),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (session.completed) TimerAccent else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        IconButton(onClick = onDelete) {
+            Icon(
+                painter = painterResource(R.drawable.ic_delete),
+                contentDescription = "删除",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportContent(summary: FocusSummary) {
+    if (summary.sessions.isEmpty()) {
+        EmptyReportCard(
+            icon = R.drawable.ic_tool_timer,
+            text = "${summary.rangeName}还没有专注记录",
+            accent = TimerAccent
+        )
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        TotalsCard(summary)
+        TrendCard(summary)
+        HourSlotCard(summary)
+    }
+}
+
+@Composable
+private fun TotalsCard(summary: FocusSummary) {
+    SectionCard(title = "${summary.rangeName}专注") {
+        Text(
+            text = DateRanges.formatHeading(summary.range),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = TimerAnalytics.formatDuration(summary.totalMillis),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = TimerAccent
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "${summary.activeDays} 天有记录 · 完成 ${summary.completedCount} / " +
+                "${summary.sessionCount} 次",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MetricTile(
+                modifier = Modifier.weight(1f),
+                label = "完成率",
+                value = "${(summary.completionRate * 100).roundToInt()}%",
+                accent = TimerAccent
+            )
+            MetricTile(
+                modifier = Modifier.weight(1f),
+                label = "平均每次",
+                value = TimerAnalytics.formatCompact(summary.averageMillis),
+                accent = StatsAccent
+            )
+            MetricTile(
+                modifier = Modifier.weight(1f),
+                label = "最长一次",
+                value = TimerAnalytics.formatCompact(summary.longestMillis),
+                accent = NoteAccent
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MetricTile(
+                modifier = Modifier.weight(1f),
+                label = "中断",
+                value = "${summary.interruptedCount} 次",
+                accent = if (summary.interruptedCount > 0) ClayRed else TimerAccent
+            )
+            MetricTile(
+                modifier = Modifier.weight(1f),
+                label = "活跃天数",
+                value = "${summary.activeDays} 天",
+                accent = TimerAccent
+            )
+            MetricTile(
+                modifier = Modifier.weight(1f),
+                label = "计划总时长",
+                value = TimerAnalytics.formatCompact(summary.plannedMillis),
+                accent = TimerAccent
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrendCard(summary: FocusSummary) {
+    val trend = remember(summary) { TimerAnalytics.trend(summary) }
+    SectionCard(title = "专注趋势（分钟）") {
+        BarChart(
+            bars = trend.map { BarDatum(it.label, it.minutes) },
+            color = TimerAccent
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = peakDescription(summary) ?: "这段时间还没有专注记录",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun HourSlotCard(summary: FocusSummary) {
+    val slots = remember(summary) { TimerAnalytics.hourSlots(summary) }
+    SectionCard(title = "时段分布（分钟）") {
+        BarChart(
+            bars = slots.map { BarDatum(it.label, it.minutes) },
+            color = StatsAccent,
+            height = 96.dp
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = if (summary.bestHour >= 0) {
+                "最专注的时段在 ${summary.bestHour} 点前后"
+            } else {
+                "开始一次计时，这里会记下你的专注时段"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** 趋势里最高的那根柱子，翻译成「周三 90 分钟」这种能读懂的话。 */
+private fun peakDescription(summary: FocusSummary): String? {
+    val trend = TimerAnalytics.trend(summary)
+    val index = trend.indices.maxByOrNull { trend[it].minutes } ?: return null
+    val peak = trend[index]
+    if (peak.minutes <= 0f) return null
+    val name = when (summary.period) {
+        TimerPeriod.DAY -> "${index} 点前后"
+        TimerPeriod.WEEK -> "周${peak.label}"
+        TimerPeriod.MONTH -> "${index + 1} 日"
+        TimerPeriod.YEAR -> "${index + 1} 月"
+        TimerPeriod.CUSTOM -> peak.label.ifEmpty { "所选区间里" }
+    }
+    return "$name 最专注 · ${TimerAnalytics.formatCompact((peak.minutes * 60_000f).toLong())}"
 }
 
 @Composable
@@ -551,3 +961,7 @@ private fun formatRemaining(millis: Long): String {
         String.format(Locale.US, "%02d:%02d", minutes, seconds)
     }
 }
+
+/** 明细按天分组后，行内只需要时分——日期已经写在分组标题上了。 */
+private fun formatClock(millis: Long): String =
+    SimpleDateFormat("HH:mm", Locale.CHINA).format(Date(millis))

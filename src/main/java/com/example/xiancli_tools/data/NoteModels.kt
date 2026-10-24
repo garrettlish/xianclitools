@@ -12,12 +12,44 @@ enum class NoteCategory(val label: String) {
     OTHER("其他")
 }
 
+/**
+ * 一条备忘。
+ *
+ * - [remindAt]：到点提醒的时间；null 表示不提醒。只有「提醒」「待办」两类会用到。
+ * - [done]：待办是否已勾掉。其他类型也可以勾，语义是「这件事处理完了」。
+ * - [moodLevel]：心情等级 1..5（1 低落、5 很好），只有「心情」类会用到。
+ */
 data class Note(
     val id: Long,
     val category: NoteCategory,
     val content: String,
-    val timeMillis: Long
-)
+    val timeMillis: Long,
+    val remindAt: Long? = null,
+    val done: Boolean = false,
+    val moodLevel: Int? = null
+) {
+    val hasPendingReminder: Boolean
+        get() = remindAt != null && remindAt > System.currentTimeMillis()
+}
+
+/** 心情等级的可选档位，UI 与日历取色共用同一套定义。 */
+object MoodLevels {
+
+    const val MIN = 1
+    const val MAX = 5
+
+    private val labels = mapOf(
+        1 to "低落",
+        2 to "疲惫",
+        3 to "平静",
+        4 to "不错",
+        5 to "很好"
+    )
+
+    fun label(level: Int?): String = labels[level] ?: "未记录"
+
+    fun sanitize(level: Int?): Int? = level?.takeIf { it in MIN..MAX }
+}
 
 enum class NotePeriod(val label: String) {
     DAY("日"),
@@ -69,6 +101,22 @@ data class NoteSummary(
 
     val topCategory: NoteCategorySummary?
         get() = categorySummaries.firstOrNull()
+
+    /** 还没勾掉的待办，最近记的排前面。 */
+    val pendingTodos: List<Note>
+        get() = notes
+            .filter { it.category == NoteCategory.TODO && !it.done }
+            .sortedByDescending { it.timeMillis }
+
+    val todoCount: Int
+        get() = notes.count { it.category == NoteCategory.TODO }
+
+    val doneTodoCount: Int
+        get() = notes.count { it.category == NoteCategory.TODO && it.done }
+
+    /** 待办完成率，0..100；没有待办时返回 0。 */
+    val todoCompletionRate: Int
+        get() = if (todoCount == 0) 0 else (doneTodoCount * 100 / todoCount)
 }
 
 object NoteAnalytics {
@@ -160,6 +208,31 @@ object NoteAnalytics {
     private fun daysInMonth(millis: Long): Int = Calendar.getInstance().apply {
         timeInMillis = millis
     }.getActualMaximum(Calendar.DAY_OF_MONTH)
+
+    /**
+     * 区间内每天的心情等级，供日历上色。同一天记了多条时取最新一条，
+     * 因为心情是「此刻状态」，后记的更能代表这一天结束时的样子。
+     */
+    fun moodByDay(notes: List<Note>, range: DateRange): Map<String, Int> {
+        val result = LinkedHashMap<String, Int>()
+        notes.filter {
+            it.category == NoteCategory.MOOD &&
+                it.moodLevel != null &&
+                it.timeMillis in range.startMillis until range.endMillis
+        }.sortedBy { it.timeMillis }.forEach { note ->
+            note.moodLevel?.let { result[DateRanges.dayKey(note.timeMillis)] = it }
+        }
+        return result
+    }
+
+    fun averageMood(notes: List<Note>, range: DateRange): Float {
+        val levels = notes.filter {
+            it.category == NoteCategory.MOOD &&
+                it.moodLevel != null &&
+                it.timeMillis in range.startMillis until range.endMillis
+        }.mapNotNull { it.moodLevel }
+        return if (levels.isEmpty()) 0f else levels.average().toFloat()
+    }
 
     fun formatDateHeading(summary: NoteSummary): String {
         val calendar = Calendar.getInstance().apply { timeInMillis = summary.startMillis }

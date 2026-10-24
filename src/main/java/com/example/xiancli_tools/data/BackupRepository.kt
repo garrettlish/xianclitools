@@ -5,8 +5,8 @@ import android.net.Uri
 import java.io.FileNotFoundException
 
 /**
- * 备份的落盘与恢复：把记事、记账、轨迹打包成单个 JSON 文件，
- * 或者从这样一个文件里把三类数据写回本地。
+ * 备份的落盘与恢复：把记事、记账、轨迹、专注记录、习惯、出行打包成单个 JSON 文件，
+ * 或者从这样一个文件里把数据写回本地。
  *
  * 文件读写走 SAF（系统文件选择器）给出的 Uri，因此不需要任何存储权限。
  */
@@ -16,11 +16,17 @@ class BackupRepository(context: Context) {
     private val noteRepository = NoteRepository(appContext)
     private val ledgerRepository = LedgerRepository(appContext)
     private val trackRepository = TrackRepository(appContext)
+    private val timerRepository = TimerSessionRepository(appContext)
+    private val habitRepository = HabitRepository(appContext)
+    private val tripRepository = TripRepository(appContext)
 
     fun snapshot(): BackupPayload = BackupPayload(
         notes = noteRepository.loadNotes(),
         records = ledgerRepository.loadRecords(),
-        sessions = trackRepository.loadSessions()
+        sessions = trackRepository.loadSessions(),
+        timers = timerRepository.loadSessions(),
+        habits = habitRepository.loadHabits(),
+        trips = tripRepository.loadTrips()
     )
 
     /** 把当前全部数据写入指定 Uri，返回写出的内容。 */
@@ -49,5 +55,8 @@ class BackupRepository(context: Context) {
         noteRepository.replaceAll(target.notes)
         ledgerRepository.replaceAll(target.records)
         trackRepository.replaceAll(target.sessions)
+        timerRepository.replaceAll(target.timers)
+        habitRepository.replaceAll(target.habits)
+        tripRepository.replaceAll(target.trips)
     }
 }

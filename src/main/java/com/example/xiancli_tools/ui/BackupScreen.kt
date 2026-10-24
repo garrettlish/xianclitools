@@ -51,7 +51,10 @@ import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.BackupPayload
 import com.example.xiancli_tools.data.BackupRepository
 import com.example.xiancli_tools.ui.theme.LedgerAccent
+import com.example.xiancli_tools.ui.theme.MutedRose
+import com.example.xiancli_tools.ui.theme.MutedTeal
 import com.example.xiancli_tools.ui.theme.NoteAccent
+import com.example.xiancli_tools.ui.theme.TimerAccent
 import com.example.xiancli_tools.ui.theme.TrackAccent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -92,8 +95,9 @@ fun BackupScreen(onBack: () -> Unit) {
             busy = false
             result.onSuccess { exported ->
                 notify(
-                    "已导出 备忘 ${exported.notes.size} 条 · " +
-                        "账本 ${exported.records.size} 条 · 足迹 ${exported.sessions.size} 条"
+                    "已导出 ${exported.totalCount} 条：备忘 ${exported.notes.size} · " +
+                        "账本 ${exported.records.size} · 足迹 ${exported.sessions.size} · " +
+                        "专注 ${exported.timers.size} · 习惯 ${exported.habits.size}"
                 )
             }.onFailure { notify("导出失败：${it.message ?: "未知错误"}") }
         }
@@ -128,8 +132,9 @@ fun BackupScreen(onBack: () -> Unit) {
             busy = false
             result.onSuccess {
                 val message = if (replace) {
-                    "已覆盖导入 备忘 ${payload.notes.size} 条 · " +
-                        "账本 ${payload.records.size} 条 · 足迹 ${payload.sessions.size} 条"
+                    "已覆盖导入 ${payload.totalCount} 条：备忘 ${payload.notes.size} · " +
+                        "账本 ${payload.records.size} · 足迹 ${payload.sessions.size} · " +
+                        "专注 ${payload.timers.size} · 习惯 ${payload.habits.size}"
                 } else {
                     val added = incoming.newCountAgainst(before)
                     "已合并导入：新增 $added 条，跳过 ${incoming.totalCount - added} 条"
@@ -193,6 +198,9 @@ fun BackupScreen(onBack: () -> Unit) {
                     CountRow("备忘", payload.notes.size, NoteAccent)
                     CountRow("账本", payload.records.size, LedgerAccent)
                     CountRow("足迹", payload.sessions.size, TrackAccent)
+                    CountRow("专注", payload.timers.size, TimerAccent)
+                    CountRow("习惯", payload.habits.size, MutedTeal)
+                    CountRow("出行", payload.trips.size, MutedRose)
                 }
             }
 
@@ -201,7 +209,7 @@ fun BackupScreen(onBack: () -> Unit) {
             Button(
                 onClick = {
                     exportLauncher.launch(
-                        "方寸备份-${SimpleDateFormat("yyyyMMdd-HHmm", Locale.CHINA).format(Date())}.json"
+                        "朝夕备份-${SimpleDateFormat("yyyyMMdd-HHmm", Locale.CHINA).format(Date())}.json"
                     )
                 },
                 enabled = !busy,
