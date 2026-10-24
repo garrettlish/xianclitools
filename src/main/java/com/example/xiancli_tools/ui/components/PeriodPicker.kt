@@ -5,7 +5,6 @@ import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,49 +28,6 @@ import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.DateRange
 import com.example.xiancli_tools.data.DateRanges
 import java.util.Calendar
-
-/** 报表周期切换：日 / 周 / 月 / 年 / 自定义。 */
-@Composable
-fun PeriodTabs(
-    labels: List<String>,
-    selectedIndex: Int,
-    onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(14.dp)
-            )
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        labels.forEachIndexed { index, label ->
-            val active = index == selectedIndex
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        if (active) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        RoundedCornerShape(10.dp)
-                    )
-                    .clickable { onSelect(index) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (active) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
 
 /** 自定义区间的起止日期选择：点哪端改哪端，自动保证「开始 ≤ 结束」。 */
 @Composable

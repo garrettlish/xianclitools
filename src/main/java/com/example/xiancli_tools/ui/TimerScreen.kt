@@ -59,6 +59,10 @@ import com.example.xiancli_tools.data.RingtoneResolver
 import com.example.xiancli_tools.data.SettingsRepository
 import com.example.xiancli_tools.timer.TimerScheduler
 import com.example.xiancli_tools.ui.components.IconBadge
+import com.example.xiancli_tools.ui.theme.MutedTeal
+import com.example.xiancli_tools.ui.theme.NoteAccent
+import com.example.xiancli_tools.ui.theme.StatsAccent
+import com.example.xiancli_tools.ui.theme.TimerAccent
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -74,10 +78,10 @@ private data class TimerOption(
 )
 
 private val timerOptions = listOf(
-    TimerOption("10 分钟", 10, "冥想 · 放松", Color(0xFF2196F3)),
-    TimerOption("25 分钟", 25, "番茄专注", Color(0xFFF59E0B)),
-    TimerOption("50 分钟", 50, "深度工作", Color(0xFF8B5CF6)),
-    TimerOption("自定义", 0, "自由设置", Color(0xFF00ACC1), R.drawable.ic_add, custom = true)
+    TimerOption("10 分钟", 10, "冥想 · 放松", StatsAccent),
+    TimerOption("25 分钟", 25, "番茄专注", TimerAccent),
+    TimerOption("50 分钟", 50, "深度工作", NoteAccent),
+    TimerOption("自定义", 0, "自由设置", MutedTeal, R.drawable.ic_add, custom = true)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -151,7 +155,7 @@ fun TimerScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
@@ -299,7 +303,7 @@ private fun ActiveTimerCard(
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
@@ -322,13 +326,13 @@ private fun ActiveTimerCard(
                 Text(
                     text = "$label 定时进行中",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 Text(
                     text = formatRemaining(remainingMillis),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
             OutlinedButton(onClick = onCancel) {
@@ -347,7 +351,7 @@ private fun NotificationMethodCard(
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
@@ -407,7 +411,9 @@ private fun MethodRow(icon: Int, title: String, value: String) {
 private fun ExactAlarmBanner(onEnable: () -> Unit) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -420,11 +426,11 @@ private fun ExactAlarmBanner(onEnable: () -> Unit) {
             Text(
                 text = "未开启精确闹钟，定时可能略有延迟",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF8A5300),
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.weight(1f)
             )
             TextButton(onClick = onEnable) {
-                Text("去开启", color = Color(0xFF8A5300))
+                Text("去开启", color = MaterialTheme.colorScheme.onSecondaryContainer)
             }
         }
     }

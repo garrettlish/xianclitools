@@ -10,7 +10,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -57,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.DateRanges
+import com.example.xiancli_tools.data.PeriodSummary
 import com.example.xiancli_tools.data.TrackAnalytics
 import com.example.xiancli_tools.data.TrackPeriod
 import com.example.xiancli_tools.data.TrackRepository
@@ -69,9 +69,14 @@ import com.example.xiancli_tools.ui.components.ChartSlice
 import com.example.xiancli_tools.ui.components.ConfirmDeleteDialog
 import com.example.xiancli_tools.ui.components.CustomRangeBar
 import com.example.xiancli_tools.ui.components.DonutChart
+import com.example.xiancli_tools.ui.components.EmptyReportCard
 import com.example.xiancli_tools.ui.components.IconBadge
-import com.example.xiancli_tools.ui.components.PeriodTabs
+import com.example.xiancli_tools.ui.components.MetricTile
+import com.example.xiancli_tools.ui.components.SectionCard
+import com.example.xiancli_tools.ui.components.SegmentedTabs
 import com.example.xiancli_tools.ui.components.showDatePicker
+import com.example.xiancli_tools.ui.theme.ClayRed
+import com.example.xiancli_tools.ui.theme.TrackAccent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -82,7 +87,11 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
-private val TrackAccent = Color(0xFF00897B)
+/** 足迹页的两块内容：记录与统计。 */
+private enum class TrackTab(val label: String) {
+    RECORD("记录"),
+    REPORT("统计")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,6 +105,7 @@ fun TrackScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val snapshot by TrackRecorderState.state.collectAsState()
+    var tab by remember { mutableStateOf(TrackTab.RECORD) }
     var sessions by remember { mutableStateOf<List<TrackSession>>(emptyList()) }
     var selectedMode by remember { mutableStateOf(TransportMode.WALK) }
     var period by remember { mutableStateOf(TrackPeriod.DAY) }
@@ -103,6 +113,9 @@ fun TrackScreen(
     var elapsed by remember { mutableLongStateOf(0L) }
     var pendingMode by remember { mutableStateOf<TransportMode?>(null) }
     var pendingDelete by remember { mutableStateOf<TrackSession?>(null) }
+
+    val recordScroll = rememberScrollState()
+    val reportScroll = rememberScrollState()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -189,7 +202,7 @@ fun TrackScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
@@ -199,103 +212,119 @@ fun TrackScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp)
         ) {
-            Spacer(Modifier.height(8.dp))
-            if (snapshot.recording) {
-                ActiveRecordingCard(
-                    snapshot = snapshot,
-                    elapsed = elapsed,
-                    onStop = {
-                        stopRecording(context)
-                        scope.launch { snackbarHostState.showSnackbar("已结束记录") }
-                    }
-                )
-            } else {
-                ModeSelector(
-                    selected = selectedMode,
-                    onSelect = { selectedMode = it }
-                )
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = {
-                        val fine = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-                        val coarse = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-                        if (fine || coarse) {
-                            startRecording(context, selectedMode, scope, snackbarHostState)
-                        } else {
-                            pendingMode = selectedMode
-                            permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = selectedMode.accent
-                    )
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_play_arrow),
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("开始记录${selectedMode.label}")
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "记录中可锁屏或切到后台，轨迹会继续记录。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            SegmentedTabs(
+                labels = TrackTab.entries.map { it.label },
+                selectedIndex = tab.ordinal,
+                onSelect = { tab = TrackTab.entries[it] },
+                accent = TrackAccent,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 4.dp, bottom = 12.dp)
+            )
 
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = "统计总结",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(12.dp))
-            PeriodTabs(
-                labels = TrackPeriod.entries.map { it.label },
-                selectedIndex = period.ordinal,
-                onSelect = { period = TrackPeriod.entries[it] }
-            )
-            if (period == TrackPeriod.CUSTOM) {
-                Spacer(Modifier.height(8.dp))
-                CustomRangeBar(
-                    range = customRange,
-                    accent = TrackAccent,
-                    onPickStart = { pickRangeStart() },
-                    onPickEnd = { pickRangeEnd() }
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "共 ${customRange.dayCount} 天",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            when (tab) {
+                TrackTab.RECORD -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(recordScroll)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 24.dp)
+                ) {
+                    if (snapshot.recording) {
+                        ActiveRecordingCard(
+                            snapshot = snapshot,
+                            elapsed = elapsed,
+                            onStop = {
+                                stopRecording(context)
+                                scope.launch { snackbarHostState.showSnackbar("已结束记录") }
+                            }
+                        )
+                    } else {
+                        ModeSelector(
+                            selected = selectedMode,
+                            onSelect = { selectedMode = it }
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                val fine = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.ACCESS_FINE_LOCATION
+                                ) == PackageManager.PERMISSION_GRANTED
+                                val coarse = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                ) == PackageManager.PERMISSION_GRANTED
+                                if (fine || coarse) {
+                                    startRecording(context, selectedMode, scope, snackbarHostState)
+                                } else {
+                                    pendingMode = selectedMode
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = selectedMode.accent
+                            )
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_play_arrow),
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("开始记录${selectedMode.label}")
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "记录中可锁屏或切到后台，轨迹会继续记录。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                TrackTab.REPORT -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(reportScroll)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 24.dp)
+                ) {
+                    SegmentedTabs(
+                        labels = TrackPeriod.entries.map { it.label },
+                        selectedIndex = period.ordinal,
+                        onSelect = { period = TrackPeriod.entries[it] }
+                    )
+                    if (period == TrackPeriod.CUSTOM) {
+                        Spacer(Modifier.height(8.dp))
+                        CustomRangeBar(
+                            range = customRange,
+                            accent = TrackAccent,
+                            onPickStart = { pickRangeStart() },
+                            onPickEnd = { pickRangeEnd() }
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "共 ${customRange.dayCount} 天",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    SummaryContent(
+                        summary = summary,
+                        onOpenMap = onOpenMap,
+                        onDelete = { pendingDelete = it }
+                    )
+                }
             }
-            Spacer(Modifier.height(12.dp))
-            SummaryContent(
-                summary = summary,
-                period = period,
-                onOpenMap = onOpenMap,
-                onDelete = { pendingDelete = it }
-            )
         }
     }
 
@@ -366,10 +395,10 @@ private fun ModeCard(
 ) {
     val accent = mode.accent
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) accent.copy(alpha = 0.16f)
-            else MaterialTheme.colorScheme.surfaceVariant
+            else MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = modifier.clickable(onClick = onClick)
@@ -406,7 +435,7 @@ private fun ActiveRecordingCard(
 ) {
     val accent = snapshot.mode.accent
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.14f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
@@ -436,7 +465,7 @@ private fun ActiveRecordingCard(
                 Box(
                     modifier = Modifier
                         .size(10.dp)
-                        .background(Color(0xFFEA4335), CircleShape)
+                        .background(ClayRed, CircleShape)
                 )
             }
             Spacer(Modifier.height(16.dp))
@@ -444,17 +473,19 @@ private fun ActiveRecordingCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                RecordingMetric(
+                MetricTile(
                     modifier = Modifier.weight(1f),
                     label = "时长",
                     value = TrackAnalytics.formatClock(elapsed),
-                    accent = accent
+                    accent = accent,
+                    container = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
                 )
-                RecordingMetric(
+                MetricTile(
                     modifier = Modifier.weight(1f),
                     label = "里程",
                     value = TrackAnalytics.formatDistance(snapshot.distanceMeters),
-                    accent = accent
+                    accent = accent,
+                    container = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
                 )
             }
             Spacer(Modifier.height(16.dp))
@@ -475,72 +506,17 @@ private fun ActiveRecordingCard(
 }
 
 @Composable
-private fun RecordingMetric(
-    label: String,
-    value: String,
-    accent: Color,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .background(
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                RoundedCornerShape(14.dp)
-            )
-            .padding(12.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = accent
-        )
-    }
-}
-
-@Composable
 private fun SummaryContent(
-    summary: com.example.xiancli_tools.data.PeriodSummary,
-    period: TrackPeriod,
+    summary: PeriodSummary,
     onOpenMap: (List<TrackSession>) -> Unit,
     onDelete: (TrackSession) -> Unit
 ) {
     if (summary.sessions.isEmpty()) {
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                IconBadge(
-                    icon = R.drawable.ic_tool_route,
-                    tint = TrackAccent,
-                    container = TrackAccent.copy(alpha = 0.14f),
-                    size = 56.dp,
-                    iconSize = 28.dp
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "${summary.rangeName}还没有轨迹记录",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        EmptyReportCard(
+            icon = R.drawable.ic_tool_route,
+            text = "${summary.rangeName}还没有轨迹记录",
+            accent = TrackAccent
+        )
         return
     }
 
@@ -552,25 +528,25 @@ private fun SummaryContent(
 }
 
 @Composable
-private fun TotalsCard(summary: com.example.xiancli_tools.data.PeriodSummary) {
+private fun TotalsCard(summary: PeriodSummary) {
     SectionCard(title = "${summary.rangeName}汇总") {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            RecordingMetric(
+            MetricTile(
                 modifier = Modifier.weight(1f),
                 label = "总里程",
                 value = TrackAnalytics.formatDistance(summary.totalDistanceMeters),
                 accent = TrackAccent
             )
-            RecordingMetric(
+            MetricTile(
                 modifier = Modifier.weight(1f),
                 label = "总时长",
                 value = TrackAnalytics.formatDuration(summary.totalDurationMillis),
                 accent = TrackAccent
             )
-            RecordingMetric(
+            MetricTile(
                 modifier = Modifier.weight(1f),
                 label = "记录次数",
                 value = "${summary.sessions.size} 次",
@@ -581,7 +557,7 @@ private fun TotalsCard(summary: com.example.xiancli_tools.data.PeriodSummary) {
 }
 
 @Composable
-private fun ModeBreakdownCard(summary: com.example.xiancli_tools.data.PeriodSummary) {
+private fun ModeBreakdownCard(summary: PeriodSummary) {
     val modes = summary.modeSummaries
     val maxDistance = modes.maxOfOrNull { it.distanceMeters }?.takeIf { it > 0 } ?: 1.0
     val totalDuration = summary.totalDurationMillis.coerceAtLeast(1L)
@@ -669,7 +645,7 @@ private fun ModeBreakdownCard(summary: com.example.xiancli_tools.data.PeriodSumm
                         .fillMaxWidth()
                         .height(6.dp)
                         .background(
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f),
+                            MaterialTheme.colorScheme.surfaceContainerHighest,
                             RoundedCornerShape(3.dp)
                         )
                 ) {
@@ -698,7 +674,7 @@ private fun ModeBreakdownCard(summary: com.example.xiancli_tools.data.PeriodSumm
 
 @Composable
 private fun SessionListCard(
-    summary: com.example.xiancli_tools.data.PeriodSummary,
+    summary: PeriodSummary,
     onOpenMap: (List<TrackSession>) -> Unit,
     onDelete: (TrackSession) -> Unit
 ) {
@@ -776,31 +752,6 @@ private fun SessionRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun SectionCard(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(12.dp))
-            content()
         }
     }
 }

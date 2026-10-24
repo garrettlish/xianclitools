@@ -7,4 +7,6 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- 与 Compose 主题的 Paper 一致，避免启动瞬间闪一下纯白 -->
+    <color name="window_background">#FFFAF7F2</color>
 </resources>

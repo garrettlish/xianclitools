@@ -4,17 +4,25 @@ import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.Color
 import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.ExpenseCategory
+import com.example.xiancli_tools.ui.theme.ClayRed
+import com.example.xiancli_tools.ui.theme.MutedRose
+import com.example.xiancli_tools.ui.theme.MutedTeal
+import com.example.xiancli_tools.ui.theme.NoteAccent
+import com.example.xiancli_tools.ui.theme.StatsAccent
+import com.example.xiancli_tools.ui.theme.TimerAccent
+import com.example.xiancli_tools.ui.theme.TrackAccent
+import com.example.xiancli_tools.ui.theme.WarmGray
 
 val ExpenseCategory.accent: Color
     get() = when (this) {
-        ExpenseCategory.FOOD -> Color(0xFFEA4335)
-        ExpenseCategory.TRANSPORT -> Color(0xFF2196F3)
-        ExpenseCategory.HOTEL -> Color(0xFF8B5CF6)
-        ExpenseCategory.TICKET -> Color(0xFF34A853)
-        ExpenseCategory.SHOPPING -> Color(0xFFEC407A)
-        ExpenseCategory.ENTERTAINMENT -> Color(0xFFF59E0B)
-        ExpenseCategory.MEDICAL -> Color(0xFF00ACC1)
-        ExpenseCategory.OTHER -> Color(0xFF9E9E9E)
+        ExpenseCategory.FOOD -> ClayRed
+        ExpenseCategory.TRANSPORT -> StatsAccent
+        ExpenseCategory.HOTEL -> NoteAccent
+        ExpenseCategory.TICKET -> TrackAccent
+        ExpenseCategory.SHOPPING -> MutedRose
+        ExpenseCategory.ENTERTAINMENT -> TimerAccent
+        ExpenseCategory.MEDICAL -> MutedTeal
+        ExpenseCategory.OTHER -> WarmGray
     }
 
 val ExpenseCategory.iconRes: Int

@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,26 +48,31 @@ import com.example.xiancli_tools.data.PhoneStatsRepository
 import com.example.xiancli_tools.ui.components.ChartSlice
 import com.example.xiancli_tools.ui.components.DonutChart
 import com.example.xiancli_tools.ui.components.IconBadge
+import com.example.xiancli_tools.ui.components.SectionCard
 import com.example.xiancli_tools.ui.components.StackedBar
+import com.example.xiancli_tools.ui.theme.NoteAccent
+import com.example.xiancli_tools.ui.theme.StatsAccent
+import com.example.xiancli_tools.ui.theme.TimerAccent
+import com.example.xiancli_tools.ui.theme.TrackAccent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.roundToInt
 
 private val categoryColors = listOf(
-    Color(0xFF4C6FFF),
-    Color(0xFF8B5CF6),
-    Color(0xFF34A853),
-    Color(0xFFF59E0B),
-    Color(0xFFEA4335),
-    Color(0xFF00ACC1),
-    Color(0xFFEC407A),
-    Color(0xFF7CB342),
-    Color(0xFF5C6BC0),
-    Color(0xFF9E9E9E)
+    Color(0xFF2F86D6),
+    Color(0xFF9B6DB5),
+    Color(0xFF5AA469),
+    Color(0xFFE8963A),
+    Color(0xFFC05A45),
+    Color(0xFF4E9BA0),
+    Color(0xFFC4677F),
+    Color(0xFF7E9B5C),
+    Color(0xFF6C7BB0),
+    Color(0xFF9C948A)
 )
 
-private val undefinedColor = Color(0xFF9E9E9E)
+private val undefinedColor = Color(0xFF9C948A)
 
 private fun colorFor(category: AppCategory): Color =
     if (category == AppCategory.UNDEFINED) {
@@ -100,7 +104,7 @@ fun PhoneStatsScreen(onBack: () -> Unit) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         }
@@ -144,14 +148,14 @@ private fun OverviewGrid(stats: PhoneStats) {
                 icon = R.drawable.ic_apps,
                 label = "应用总数",
                 value = "${stats.totalApps}",
-                color = Color(0xFF4C6FFF)
+                color = StatsAccent
             )
             StatCard(
                 modifier = Modifier.weight(1f),
                 icon = R.drawable.ic_phone_android,
                 label = "第三方应用",
                 value = "${stats.userApps}",
-                color = Color(0xFF34A853)
+                color = TrackAccent
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -160,14 +164,14 @@ private fun OverviewGrid(stats: PhoneStats) {
                 icon = R.drawable.ic_settings,
                 label = "系统应用",
                 value = "${stats.systemApps}",
-                color = Color(0xFFF59E0B)
+                color = TimerAccent
             )
             StatCard(
                 modifier = Modifier.weight(1f),
                 icon = R.drawable.ic_pie_chart,
                 label = "可启动应用",
                 value = "${stats.launchableApps}",
-                color = Color(0xFF8B5CF6)
+                color = NoteAccent
             )
         }
     }
@@ -182,9 +186,9 @@ private fun StatCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = modifier
@@ -334,7 +338,7 @@ private fun MemorySection(stats: PhoneStats) {
     val total = stats.memoryTotalBytes
     val used = stats.memoryUsedBytes
     val free = (total - used).coerceAtLeast(0L)
-    val usedColor = Color(0xFF8B5CF6)
+    val usedColor = NoteAccent
     val freeColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
     val ratio = if (total > 0) used.toFloat() / total else 0f
 
@@ -392,31 +396,6 @@ private fun StorageRow(label: String, value: String) {
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    }
-}
-
-@Composable
-private fun SectionCard(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(12.dp))
-            content()
-        }
     }
 }
 

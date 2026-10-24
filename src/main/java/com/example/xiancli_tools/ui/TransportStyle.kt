@@ -4,12 +4,15 @@ import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.Color
 import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.TransportMode
+import com.example.xiancli_tools.ui.theme.StatsAccent
+import com.example.xiancli_tools.ui.theme.TimerAccent
+import com.example.xiancli_tools.ui.theme.TrackAccent
 
 val TransportMode.accent: Color
     get() = when (this) {
-        TransportMode.WALK -> Color(0xFF34A853)
-        TransportMode.BIKE -> Color(0xFF2196F3)
-        TransportMode.DRIVE -> Color(0xFFF59E0B)
+        TransportMode.WALK -> TrackAccent
+        TransportMode.BIKE -> StatsAccent
+        TransportMode.DRIVE -> TimerAccent
     }
 
 val TransportMode.iconRes: Int

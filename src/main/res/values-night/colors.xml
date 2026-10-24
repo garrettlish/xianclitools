@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 与 Compose 暗色主题的 background 一致，避免夜间启动闪白 -->
+    <color name="window_background">#FF171614</color>
+</resources>

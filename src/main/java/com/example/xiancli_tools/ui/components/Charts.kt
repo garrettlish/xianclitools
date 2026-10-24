@@ -34,9 +34,11 @@ fun DonutChart(
     slices: List<ChartSlice>,
     modifier: Modifier = Modifier,
     strokeWidth: Dp = 24.dp,
-    trackColor: Color = Color(0x1F000000),
+    trackColor: Color? = null,
     center: @Composable () -> Unit = {}
 ) {
+    // 未指定轨道色时跟随主题描边色：暖白底上用黑色半透明会发灰发脏。
+    val track = trackColor ?: MaterialTheme.colorScheme.outlineVariant
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val stroke = strokeWidth.toPx()
@@ -46,7 +48,7 @@ fun DonutChart(
             val arcSize = Size(diameter, diameter)
 
             drawArc(
-                color = trackColor,
+                color = track,
                 startAngle = 0f,
                 sweepAngle = 360f,
                 useCenter = false,
@@ -132,14 +134,15 @@ fun StackedBar(
     segments: List<ChartSlice>,
     modifier: Modifier = Modifier,
     height: Dp = 12.dp,
-    trackColor: Color = Color(0x1F000000)
+    trackColor: Color? = null
 ) {
+    val track = trackColor ?: MaterialTheme.colorScheme.outlineVariant
     Canvas(
         modifier
             .height(height)
             .clip(RoundedCornerShape(height / 2))
     ) {
-        drawRect(trackColor, size = size)
+        drawRect(track, size = size)
         val total = segments.sumOf { it.value.toDouble() }.toFloat()
         if (total <= 0f) return@Canvas
         var x = 0f

@@ -50,16 +50,15 @@ import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.BackupPayload
 import com.example.xiancli_tools.data.BackupRepository
+import com.example.xiancli_tools.ui.theme.LedgerAccent
+import com.example.xiancli_tools.ui.theme.NoteAccent
+import com.example.xiancli_tools.ui.theme.TrackAccent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-private val NoteAccentColor = Color(0xFF7C4DFF)
-private val LedgerAccentColor = Color(0xFFF59E0B)
-private val TrackAccentColor = Color(0xFF00897B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,7 +152,7 @@ fun BackupScreen(onBack: () -> Unit) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
@@ -179,7 +178,7 @@ fun BackupScreen(onBack: () -> Unit) {
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    containerColor = MaterialTheme.colorScheme.surface
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -191,9 +190,9 @@ fun BackupScreen(onBack: () -> Unit) {
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(4.dp))
-                    CountRow("备忘", payload.notes.size, NoteAccentColor)
-                    CountRow("账本", payload.records.size, LedgerAccentColor)
-                    CountRow("足迹", payload.sessions.size, TrackAccentColor)
+                    CountRow("备忘", payload.notes.size, NoteAccent)
+                    CountRow("账本", payload.records.size, LedgerAccent)
+                    CountRow("足迹", payload.sessions.size, TrackAccent)
                 }
             }
 

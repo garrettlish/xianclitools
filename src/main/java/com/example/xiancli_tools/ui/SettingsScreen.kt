@@ -43,7 +43,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +55,8 @@ import com.example.xiancli_tools.data.SettingsRepository
 import com.example.xiancli_tools.timer.AlarmRingingService
 import com.example.xiancli_tools.timer.TimerScheduler
 import com.example.xiancli_tools.ui.components.IconBadge
+import com.example.xiancli_tools.ui.theme.StatsAccent
+import com.example.xiancli_tools.ui.theme.TrackAccent
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -111,7 +112,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
@@ -193,7 +194,7 @@ private fun VibrationCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
@@ -206,8 +207,8 @@ private fun VibrationCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
         ) {
             IconBadge(
                 icon = R.drawable.ic_vibration,
-                tint = Color(0xFF2196F3),
-                container = Color(0xFF2196F3).copy(alpha = 0.14f)
+                tint = StatsAccent,
+                container = StatsAccent.copy(alpha = 0.14f)
             )
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -232,7 +233,7 @@ private fun RingtoneCard(title: String, onClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
@@ -247,8 +248,8 @@ private fun RingtoneCard(title: String, onClick: () -> Unit) {
         ) {
             IconBadge(
                 icon = R.drawable.ic_ringtone,
-                tint = Color(0xFF34A853),
-                container = Color(0xFF34A853).copy(alpha = 0.14f)
+                tint = TrackAccent,
+                container = TrackAccent.copy(alpha = 0.14f)
             )
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {

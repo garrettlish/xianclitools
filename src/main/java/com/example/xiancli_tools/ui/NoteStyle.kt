@@ -4,15 +4,21 @@ import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.Color
 import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.NoteCategory
+import com.example.xiancli_tools.ui.theme.ClayRed
+import com.example.xiancli_tools.ui.theme.NoteAccent
+import com.example.xiancli_tools.ui.theme.StatsAccent
+import com.example.xiancli_tools.ui.theme.TimerAccent
+import com.example.xiancli_tools.ui.theme.TrackAccent
+import com.example.xiancli_tools.ui.theme.WarmGray
 
 val NoteCategory.accent: Color
     get() = when (this) {
-        NoteCategory.REMINDER -> Color(0xFFEA4335)
-        NoteCategory.TODO -> Color(0xFF34A853)
-        NoteCategory.DIARY -> Color(0xFF2196F3)
-        NoteCategory.MOOD -> Color(0xFFF59E0B)
-        NoteCategory.IDEA -> Color(0xFF8B5CF6)
-        NoteCategory.OTHER -> Color(0xFF9E9E9E)
+        NoteCategory.REMINDER -> ClayRed
+        NoteCategory.TODO -> TrackAccent
+        NoteCategory.DIARY -> StatsAccent
+        NoteCategory.MOOD -> TimerAccent
+        NoteCategory.IDEA -> NoteAccent
+        NoteCategory.OTHER -> WarmGray
     }
 
 val NoteCategory.iconRes: Int

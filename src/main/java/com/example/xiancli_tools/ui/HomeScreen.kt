@@ -30,12 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
 import com.example.xiancli_tools.ui.components.IconBadge
-
-private val TimerAccent = Color(0xFF4C6FFF)
-private val NoteAccent = Color(0xFF7C4DFF)
-private val LedgerAccent = Color(0xFFF59E0B)
-private val TrackAccent = Color(0xFF00897B)
-private val StatsAccent = Color(0xFF34A853)
+import com.example.xiancli_tools.ui.theme.LedgerAccent
+import com.example.xiancli_tools.ui.theme.NoteAccent
+import com.example.xiancli_tools.ui.theme.StatsAccent
+import com.example.xiancli_tools.ui.theme.TimerAccent
+import com.example.xiancli_tools.ui.theme.TrackAccent
 
 @Composable
 fun HomeScreen(
@@ -57,9 +56,7 @@ fun HomeScreen(
         ) {
             Spacer(Modifier.height(12.dp))
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -67,7 +64,7 @@ fun HomeScreen(
                     text = "工具列表",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Surface(
                     onClick = onOpenBackup,
@@ -101,7 +98,7 @@ fun HomeScreen(
                 accent = TimerAccent,
                 onClick = onOpenTimer
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             ToolCard(
                 title = "备忘",
                 subtitle = "随手记下待办、灵感与心情",
@@ -109,7 +106,7 @@ fun HomeScreen(
                 accent = NoteAccent,
                 onClick = onOpenNote
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             ToolCard(
                 title = "账本",
                 subtitle = "快速记账，区间支出报告",
@@ -117,7 +114,7 @@ fun HomeScreen(
                 accent = LedgerAccent,
                 onClick = onOpenLedger
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             ToolCard(
                 title = "足迹",
                 subtitle = "步行 · 骑车 · 开车轨迹地图",
@@ -125,7 +122,7 @@ fun HomeScreen(
                 accent = TrackAccent,
                 onClick = onOpenTrack
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             ToolCard(
                 title = "本机",
                 subtitle = "应用 · 分类 · 存储与内存",
@@ -146,9 +143,9 @@ private fun ToolCard(
     onClick: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
@@ -158,16 +155,16 @@ private fun ToolCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             IconBadge(
                 icon = icon,
                 tint = accent,
                 container = accent.copy(alpha = 0.14f),
-                size = 60.dp,
-                iconSize = 30.dp
+                size = 56.dp,
+                iconSize = 28.dp
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(

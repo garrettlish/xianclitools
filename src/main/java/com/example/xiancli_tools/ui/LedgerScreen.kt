@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -45,15 +45,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
-import com.example.xiancli_tools.data.DateRange
 import com.example.xiancli_tools.data.DateRanges
 import com.example.xiancli_tools.data.ExpenseCategory
 import com.example.xiancli_tools.data.ExpenseRecord
@@ -68,9 +65,13 @@ import com.example.xiancli_tools.ui.components.ChartSlice
 import com.example.xiancli_tools.ui.components.ConfirmDeleteDialog
 import com.example.xiancli_tools.ui.components.CustomRangeBar
 import com.example.xiancli_tools.ui.components.DonutChart
+import com.example.xiancli_tools.ui.components.EmptyReportCard
 import com.example.xiancli_tools.ui.components.IconBadge
-import com.example.xiancli_tools.ui.components.PeriodTabs
+import com.example.xiancli_tools.ui.components.MetricTile
+import com.example.xiancli_tools.ui.components.SectionCard
+import com.example.xiancli_tools.ui.components.SegmentedTabs
 import com.example.xiancli_tools.ui.components.showDatePicker
+import com.example.xiancli_tools.ui.theme.LedgerAccent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -80,7 +81,11 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
-private val LedgerAccent = Color(0xFFF59E0B)
+/** 账本页的两块内容：记账与统计。 */
+private enum class LedgerTab(val label: String) {
+    QUICK("记账"),
+    REPORT("统计")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +95,7 @@ fun LedgerScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    var tab by remember { mutableStateOf(LedgerTab.QUICK) }
     var records by remember { mutableStateOf<List<ExpenseRecord>>(emptyList()) }
     var period by remember { mutableStateOf(LedgerPeriod.DAY) }
     var customRange by remember { mutableStateOf(DateRanges.lastDays()) }
@@ -98,6 +104,9 @@ fun LedgerScreen(onBack: () -> Unit) {
     var note by remember { mutableStateOf("") }
     var entryTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var pendingDelete by remember { mutableStateOf<ExpenseRecord?>(null) }
+
+    val quickScroll = rememberScrollState()
+    val reportScroll = rememberScrollState()
 
     LaunchedEffect(Unit) {
         records = withContext(Dispatchers.IO) { repository.loadRecords() }
@@ -191,7 +200,7 @@ fun LedgerScreen(onBack: () -> Unit) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
@@ -201,56 +210,73 @@ fun LedgerScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp)
         ) {
-            Spacer(Modifier.height(8.dp))
-            QuickAddCard(
-                amount = amountInput,
-                onAmountChange = { amountInput = it },
-                selectedCategory = selectedCategory,
-                onSelectCategory = { selectedCategory = it },
-                note = note,
-                onNoteChange = { note = it },
-                entryTime = entryTime,
-                onPickTime = { pickTime() },
-                onSave = { save() }
+            SegmentedTabs(
+                labels = LedgerTab.entries.map { it.label },
+                selectedIndex = tab.ordinal,
+                onSelect = { tab = LedgerTab.entries[it] },
+                accent = LedgerAccent,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 4.dp, bottom = 12.dp)
             )
 
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = "统计报告",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(12.dp))
-            PeriodTabs(
-                labels = LedgerPeriod.entries.map { it.label },
-                selectedIndex = period.ordinal,
-                onSelect = { period = LedgerPeriod.entries[it] }
-            )
-            if (period == LedgerPeriod.CUSTOM) {
-                Spacer(Modifier.height(8.dp))
-                CustomRangeBar(
-                    range = customRange,
-                    accent = LedgerAccent,
-                    onPickStart = { pickRangeStart() },
-                    onPickEnd = { pickRangeEnd() }
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "共 ${customRange.dayCount} 天",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            when (tab) {
+                LedgerTab.QUICK -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(quickScroll)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 24.dp)
+                ) {
+                    QuickAddCard(
+                        amount = amountInput,
+                        onAmountChange = { amountInput = it },
+                        selectedCategory = selectedCategory,
+                        onSelectCategory = { selectedCategory = it },
+                        note = note,
+                        onNoteChange = { note = it },
+                        entryTime = entryTime,
+                        onPickTime = { pickTime() },
+                        onSave = { save() }
+                    )
+                }
+
+                LedgerTab.REPORT -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(reportScroll)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 24.dp)
+                ) {
+                    SegmentedTabs(
+                        labels = LedgerPeriod.entries.map { it.label },
+                        selectedIndex = period.ordinal,
+                        onSelect = { period = LedgerPeriod.entries[it] }
+                    )
+                    if (period == LedgerPeriod.CUSTOM) {
+                        Spacer(Modifier.height(8.dp))
+                        CustomRangeBar(
+                            range = customRange,
+                            accent = LedgerAccent,
+                            onPickStart = { pickRangeStart() },
+                            onPickEnd = { pickRangeEnd() }
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "共 ${customRange.dayCount} 天",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    ReportContent(
+                        summary = summary,
+                        trend = trend,
+                        onDelete = { pendingDelete = it }
+                    )
+                }
             }
-            Spacer(Modifier.height(12.dp))
-            ReportContent(
-                summary = summary,
-                trend = trend,
-                onDelete = { pendingDelete = it }
-            )
         }
     }
 
@@ -282,7 +308,7 @@ private fun QuickAddCard(
     onPickTime: () -> Unit,
     onSave: () -> Unit
 ) {
-    SectionCard(title = "快速记账") {
+    SectionCard {
         OutlinedTextField(
             value = amount,
             onValueChange = onAmountChange,
@@ -312,7 +338,7 @@ private fun QuickAddCard(
                 modifier = Modifier
                     .weight(1f)
                     .background(
-                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.surfaceContainer,
                         RoundedCornerShape(14.dp)
                     )
                     .clickable(onClick = onPickTime)
@@ -382,7 +408,7 @@ private fun CategoryChip(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) accent.copy(alpha = 0.16f)
-            else MaterialTheme.colorScheme.surface
+            else MaterialTheme.colorScheme.surfaceContainer
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = modifier.clickable(onClick = onClick)
@@ -417,35 +443,11 @@ private fun ReportContent(
     onDelete: (ExpenseRecord) -> Unit
 ) {
     if (summary.records.isEmpty()) {
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                IconBadge(
-                    icon = R.drawable.ic_tool_ledger,
-                    tint = LedgerAccent,
-                    container = LedgerAccent.copy(alpha = 0.14f),
-                    size = 56.dp,
-                    iconSize = 28.dp
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "${summary.rangeName}还没有记账记录",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        EmptyReportCard(
+            icon = R.drawable.ic_tool_ledger,
+            text = "${summary.rangeName}还没有记账记录",
+            accent = LedgerAccent
+        )
         return
     }
 
@@ -475,22 +477,25 @@ private fun TotalsCard(summary: LedgerSummary) {
         Spacer(Modifier.height(12.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            ReportMetric(
+            MetricTile(
                 modifier = Modifier.weight(1f),
                 label = "笔数",
-                value = "${summary.recordCount} 笔"
+                value = "${summary.recordCount} 笔",
+                accent = LedgerAccent
             )
-            ReportMetric(
+            MetricTile(
                 modifier = Modifier.weight(1f),
                 label = "单笔均",
-                value = LedgerAnalytics.formatYuan(summary.averageCents)
+                value = LedgerAnalytics.formatYuan(summary.averageCents),
+                accent = LedgerAccent
             )
-            ReportMetric(
+            MetricTile(
                 modifier = Modifier.weight(1f),
                 label = "最大单笔",
-                value = LedgerAnalytics.formatYuan(summary.maxRecordCents)
+                value = LedgerAnalytics.formatYuan(summary.maxRecordCents),
+                accent = LedgerAccent
             )
         }
     }
@@ -608,7 +613,7 @@ private fun CategoryBreakdownCard(summary: LedgerSummary) {
                         .fillMaxWidth()
                         .height(6.dp)
                         .background(
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f),
+                            MaterialTheme.colorScheme.surfaceContainerHighest,
                             RoundedCornerShape(3.dp)
                         )
                 ) {
@@ -695,60 +700,6 @@ private fun RecordRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun ReportMetric(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .background(
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                RoundedCornerShape(14.dp)
-            )
-            .padding(12.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = LedgerAccent
-        )
-    }
-}
-
-@Composable
-private fun SectionCard(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(12.dp))
-            content()
         }
     }
 }
