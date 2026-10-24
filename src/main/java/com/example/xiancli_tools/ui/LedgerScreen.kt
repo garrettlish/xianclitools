@@ -492,8 +492,8 @@ private fun ReportContent(
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TotalsCard(summary)
-        TrendCard(summary, trend)
         CategoryBreakdownCard(summary)
+        TrendCard(summary, trend)
     }
 }
 
