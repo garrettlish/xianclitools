@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 墨底：暖黑的一层夜空，让晨光与暮色在中间那圈亮起来。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -9,34 +10,15 @@
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="linear"
-                android:startX="0"
+                android:startX="54"
                 android:startY="0"
-                android:endX="108"
+                android:endX="54"
                 android:endY="108">
                 <item
-                    android:color="#FF4F6BFF"
+                    android:color="#FF2B2521"
                     android:offset="0.0" />
                 <item
-                    android:color="#FF2E7BFF"
-                    android:offset="0.55" />
-                <item
-                    android:color="#FF00BFA6"
-                    android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <path android:pathData="M0,0h108v108h-108z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="radial"
-                android:centerX="19.4"
-                android:centerY="13"
-                android:gradientRadius="91.8">
-                <item
-                    android:color="#38FFFFFF"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00FFFFFF"
+                    android:color="#FF1B1714"
                     android:offset="1.0" />
             </gradient>
         </aapt:attr>

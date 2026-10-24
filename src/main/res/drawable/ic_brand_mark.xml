@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「朝夕」品牌记号：一个圆被晨昏线切成两半——上半是晨光琥珀（朝），下半是暮色玫褐（夕）。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="28dp"
+    android:height="28dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <group>
+        <clip-path android:pathData="M12,2.6 A9.4,9.4 0 1,0 12,21.4 A9.4,9.4 0 1,0 12,2.6 Z" />
+
+        <!-- 朝：晨光 -->
+        <path android:pathData="M0,0 H24 V11.4 H0 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="12"
+                    android:startY="2.6"
+                    android:endX="12"
+                    android:endY="11.4">
+                    <item
+                        android:color="#FFD98A3A"
+                        android:offset="0.0" />
+                    <item
+                        android:color="#FFC87A2E"
+                        android:offset="1.0" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- 夕：暮色 -->
+        <path android:pathData="M0,12.6 H24 V24 H0 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="12"
+                    android:startY="12.6"
+                    android:endX="12"
+                    android:endY="21.4">
+                    <item
+                        android:color="#FF9E5570"
+                        android:offset="0.0" />
+                    <item
+                        android:color="#FF8A4A64"
+                        android:offset="1.0" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+</vector>

@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -44,6 +45,8 @@ import com.example.xiancli_tools.data.ReviewAnalytics
 import com.example.xiancli_tools.data.TimerAnalytics
 import com.example.xiancli_tools.data.TimerSessionRepository
 import com.example.xiancli_tools.ui.components.IconBadge
+import com.example.xiancli_tools.ui.theme.BrandDawn
+import com.example.xiancli_tools.ui.theme.BrandDusk
 import com.example.xiancli_tools.ui.theme.LedgerAccent
 import com.example.xiancli_tools.ui.theme.MutedRose
 import com.example.xiancli_tools.ui.theme.MutedTeal
@@ -52,6 +55,9 @@ import com.example.xiancli_tools.ui.theme.TimerAccent
 import com.example.xiancli_tools.ui.theme.TrackAccent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+/** 「朝夕」字标的渐变：左「朝」晨光，右「夕」暮色；两端点与 `ic_brand_mark` 上下两半同色。 */
+private val BrandBrush = Brush.linearGradient(listOf(BrandDawn, BrandDusk))
 
 @Composable
 fun HomeScreen(
@@ -99,12 +105,23 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "工具列表",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_brand_mark),
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Text(
+                        text = "朝夕",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            brush = BrandBrush,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
                 Surface(
                     onClick = onOpenBackup,
                     shape = CircleShape,

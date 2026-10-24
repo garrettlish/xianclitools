@@ -365,7 +365,7 @@ xianclitools/                         # 根目录即应用模块（单模块扁�
     │   │   │   └── BootReceiver.kt         # 开机 / 升级广播接收
     │   │   └── ui/
     │   │       ├── AppRoot.kt              # 页面导航 + 通知权限申请
-    │   │       ├── HomeScreen.kt           # 首页：今日概览 + 工具列表
+    │   │       ├── HomeScreen.kt           # 首页：品牌字标 + 今日概览 + 工具卡
     │   │       ├── TimerScreen.kt          # 计时页（计时 / 明细 / 统计，含自定义时长弹窗）
     │   │       ├── NoteScreen.kt           # 备忘页（记事 / 明细 / 统计）
     │   │       ├── LedgerScreen.kt         # 账本页（快速记账 + 明细 + 周期图表报告）
@@ -387,7 +387,8 @@ xianclitools/                         # 根目录即应用模块（单模块扁�
     │   │       │   └── Charts.kt           # 环形图 / 柱状图 / 堆叠条形图（Canvas 手绘）
     │   │       └── theme/                  # Compose 主题（Palette.kt 暖色盘 + Theme.kt 亮暗配色）
     │   ├── keepRules/                # R8 keep 规则
-    │   └── res/drawable/             # 矢量图标（计时/习惯/出行/回顾等）
+    │   ├── res/drawable/             # 矢量图标（工具图标 + 品牌标记 ic_brand_mark）
+    │   └── res/mipmap-*/             # 启动图标「晨昏圆」（自适应 + 主题图标 + 旧版位图）
     ├── test/                         # 单元测试（含 Habit / Timer / Trip / Review 分析）
     └── androidTest/                  # 仪器测试
 ```

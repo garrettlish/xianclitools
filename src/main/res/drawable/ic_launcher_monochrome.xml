@@ -1,19 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 主题图标（Android 13+）：同一枚晨昏圆，纯白剪影，由系统着色。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M35,27 L43,27 A8,8 0 0 1 51,35 L51,43 A8,8 0 0 1 43,51 L35,51 A8,8 0 0 1 27,43 L27,35 A8,8 0 0 1 35,27 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M65,27 L73,27 A8,8 0 0 1 81,35 L81,43 A8,8 0 0 1 73,51 L65,51 A8,8 0 0 1 57,43 L57,35 A8,8 0 0 1 65,27 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M35,57 L43,57 A8,8 0 0 1 51,65 L51,73 A8,8 0 0 1 43,81 L35,81 A8,8 0 0 1 27,73 L27,65 A8,8 0 0 1 35,57 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M65,57 L73,57 A8,8 0 0 1 81,65 L81,73 A8,8 0 0 1 73,81 L65,81 A8,8 0 0 1 57,73 L57,65 A8,8 0 0 1 65,57 Z" />
+    <group>
+        <clip-path android:pathData="M54,23 A31,31 0 1,0 54,85 A31,31 0 1,0 54,23 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M23,23 H85 V52.4 H23 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M23,55.6 H85 V85 H23 Z" />
+    </group>
 </vector>

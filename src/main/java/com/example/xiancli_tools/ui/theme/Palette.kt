@@ -13,6 +13,13 @@ val Ink = Color(0xFF1F1D1A)
 val InkSoft = Color(0xFF6F675C)
 val LineSoft = Color(0xFFE6E0D6)
 
+/**
+ * 品牌色：晨光与暮色。既作「朝夕」字标的渐变两端，也作 `ic_brand_mark` 上下两半的配色。
+ * 比工具强调色深一档——22sp 粗体在暖白底上要够对比度（#C87A2E 约 3.1:1，#9E5570 约 4.9:1）。
+ */
+val BrandDawn = Color(0xFFC87A2E)
+val BrandDusk = Color(0xFF9E5570)
+
 /** 五个工具的强调色，同一套暖色家族：琥珀 / 藕紫 / 咖褐 / 苔绿 / 水蓝。 */
 val TimerAccent = Color(0xFFE8963A)
 val NoteAccent = Color(0xFF9B6DB5)
