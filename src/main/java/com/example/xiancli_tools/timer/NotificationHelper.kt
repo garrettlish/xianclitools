@@ -38,10 +38,10 @@ object NotificationHelper {
         if (manager.getNotificationChannel(CHANNEL_REMINDER) == null) {
             val channel = NotificationChannel(
                 CHANNEL_REMINDER,
-                "备忘与习惯提醒",
+                "备忘提醒",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "备忘、待办的到点提醒，以及习惯的每日提醒"
+                description = "备忘、待办的到点提醒"
                 enableVibration(true)
             }
             manager.createNotificationChannel(channel)
@@ -83,39 +83,30 @@ object NotificationHelper {
     }
 
     /**
-     * 备忘 / 习惯的到点通知：带「完成」与「稍后 10 分钟」两个动作，
+     * 备忘的到点通知：带「完成」与「稍后 10 分钟」两个动作，
      * 不用打开 App 就能处理掉，这是提醒类功能最要紧的一点。
      */
     fun buildReminderNotification(
         context: Context,
         title: String,
         body: String,
-        kind: String,
-        targetId: Long,
-        daily: Boolean,
-        minuteOfDay: Int
+        noteId: Long
     ): Notification {
         val doneIntent = ReminderScheduler.buildPendingIntent(
             context = context,
             requestCode = ACTION_REQUEST_CODE,
             action = ReminderReceiver.ACTION_DONE,
-            kind = kind,
-            targetId = targetId,
+            targetId = noteId,
             title = title,
-            body = body,
-            daily = daily,
-            minuteOfDay = minuteOfDay
+            body = body
         )
         val snoozeIntent = ReminderScheduler.buildPendingIntent(
             context = context,
             requestCode = ACTION_REQUEST_CODE,
             action = ReminderReceiver.ACTION_SNOOZE,
-            kind = kind,
-            targetId = targetId,
+            targetId = noteId,
             title = title,
-            body = body,
-            daily = daily,
-            minuteOfDay = minuteOfDay
+            body = body
         )
         val openIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
         val openPendingIntent = openIntent?.let {
@@ -128,10 +119,7 @@ object NotificationHelper {
         }
 
         return NotificationCompat.Builder(context, CHANNEL_REMINDER)
-            .setSmallIcon(
-                if (kind == ReminderScheduler.KIND_HABIT) R.drawable.ic_tool_habit
-                else R.drawable.ic_tool_note
-            )
+            .setSmallIcon(R.drawable.ic_tool_note)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

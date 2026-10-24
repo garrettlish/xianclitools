@@ -10,37 +10,52 @@ class TripRepository(context: Context) {
     private val appContext = context.applicationContext
     private val tripsFile = File(appContext.filesDir, TRIPS_FILE)
 
+    /** 界面用的出行：墓碑不参与展示。 */
     @Synchronized
-    fun loadTrips(): List<Trip> {
-        if (!tripsFile.exists()) return emptyList()
-        return runCatching {
-            JsonCodec.tripsFromJson(JSONArray(tripsFile.readText()))
-                .sortedByDescending { it.startMillis }
-        }.onFailure { Log.e(TAG, "读取出行失败", it) }.getOrDefault(emptyList())
-    }
+    fun loadTrips(): List<Trip> = readRaw()
+        .filter { it.deletedAt == null }
+        .sortedByDescending { it.startMillis }
+
+    /** 含墓碑的全量，备份与合并必须用它，否则删除传不到别的设备。 */
+    @Synchronized
+    fun loadAllTrips(): List<Trip> = readRaw().sortedByDescending { it.startMillis }
 
     @Synchronized
     fun saveTrip(trip: Trip) {
-        val trips = loadTrips().toMutableList()
-        trips.removeAll { it.id == trip.id }
-        trips.add(trip)
-        write(trips.sortedByDescending { it.startMillis })
+        val all = readRaw().toMutableList()
+        val previous = all.firstOrNull { it.id == trip.id }
+        all.removeAll { it.id == trip.id }
+        all.add(trip.copy(updatedAt = nextStamp(previous?.updatedAt), deletedAt = null))
+        write(all)
     }
 
     @Synchronized
     fun deleteTrip(id: Long) {
-        write(loadTrips().filterNot { it.id == id })
+        val all = readRaw()
+        val stamp = nextStamp(all.firstOrNull { it.id == id }?.updatedAt)
+        write(all.map { if (it.id == id) it.copy(deletedAt = stamp, updatedAt = stamp) else it })
     }
 
     @Synchronized
     fun replaceAll(trips: List<Trip>) {
-        write(trips.sortedByDescending { it.startMillis })
+        write(trips)
     }
+
+    private fun readRaw(): List<Trip> {
+        if (!tripsFile.exists()) return emptyList()
+        return runCatching {
+            JsonCodec.tripsFromJson(JSONArray(tripsFile.readText()))
+        }.onFailure { Log.e(TAG, "读取出行失败", it) }.getOrDefault(emptyList())
+    }
+
+    /** 修改时间戳；同一毫秒内改两次时强制比上一版大 1，保证先后可判。 */
+    private fun nextStamp(previous: Long?): Long =
+        maxOf(System.currentTimeMillis(), (previous ?: 0L) + 1L)
 
     private fun write(trips: List<Trip>) {
         runCatching {
             val temp = File(tripsFile.parentFile, "${tripsFile.name}.tmp")
-            temp.writeText(JsonCodec.tripsToJson(trips).toString())
+            temp.writeText(JsonCodec.tripsToJson(trips.sortedByDescending { it.startMillis }).toString())
             if (tripsFile.exists()) tripsFile.delete()
             temp.renameTo(tripsFile)
         }.onFailure { Log.e(TAG, "写入出行失败", it) }

@@ -1,5 +1,6 @@
 package com.example.xiancli_tools.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -47,9 +48,9 @@ import com.example.xiancli_tools.data.TimerSessionRepository
 import com.example.xiancli_tools.ui.components.IconBadge
 import com.example.xiancli_tools.ui.theme.BrandDawn
 import com.example.xiancli_tools.ui.theme.BrandDusk
+import com.example.xiancli_tools.ui.theme.DrinkAccent
 import com.example.xiancli_tools.ui.theme.LedgerAccent
 import com.example.xiancli_tools.ui.theme.MutedRose
-import com.example.xiancli_tools.ui.theme.MutedTeal
 import com.example.xiancli_tools.ui.theme.NoteAccent
 import com.example.xiancli_tools.ui.theme.TimerAccent
 import com.example.xiancli_tools.ui.theme.TrackAccent
@@ -65,7 +66,7 @@ fun HomeScreen(
     onOpenNote: () -> Unit,
     onOpenLedger: () -> Unit,
     onOpenTrack: () -> Unit,
-    onOpenHabits: () -> Unit,
+    onOpenDrink: () -> Unit,
     onOpenTrip: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenBackup: () -> Unit
@@ -109,7 +110,9 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(
+                    // 用 Image 而不是 Icon：Icon 会套上 LocalContentColor 做 tint，
+                    // 把矢量里的墨底和晨昏渐变一起刷成纯黑。
+                    Image(
                         painter = painterResource(R.drawable.ic_brand_mark),
                         contentDescription = null,
                         modifier = Modifier.size(28.dp)
@@ -187,11 +190,11 @@ fun HomeScreen(
             )
             Spacer(Modifier.height(10.dp))
             ToolCard(
-                title = "习惯",
-                subtitle = "每天打卡，看连续天数",
-                icon = R.drawable.ic_tool_habit,
-                accent = MutedTeal,
-                onClick = onOpenHabits
+                title = "饮记",
+                subtitle = "喝一次点一下，看每天的各类次数",
+                icon = R.drawable.ic_tool_drink,
+                accent = DrinkAccent,
+                onClick = onOpenDrink
             )
             Spacer(Modifier.height(10.dp))
             ToolCard(

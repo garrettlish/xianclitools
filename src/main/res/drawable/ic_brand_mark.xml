@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 「朝夕」品牌记号：一个圆被晨昏线切成两半——上半是晨光琥珀（朝），下半是暮色玫褐（夕）。 -->
+<!--
+  「朝夕」品牌记号：启动图标（ic_launcher_background + ic_launcher_foreground）的等比缩小版。
+  墨底上一枚圆被地平线切成两半，上「朝」晨光、下「夕」暮色，中间一道缝透出墨底；
+  两半都朝地平线一侧提亮，和桌面图标看到的是同一张图，改色时两边要一起改。
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="28dp"
@@ -7,42 +11,61 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <group>
-        <clip-path android:pathData="M12,2.6 A9.4,9.4 0 1,0 12,21.4 A9.4,9.4 0 1,0 12,2.6 Z" />
+    <!-- 墨底：暖黑的一层夜空 -->
+    <path android:pathData="M12,0 A12,12 0 1,0 12,24 A12,12 0 1,0 12,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="12"
+                android:startY="0"
+                android:endX="12"
+                android:endY="24">
+                <item
+                    android:color="#FF2B2521"
+                    android:offset="0.0" />
+                <item
+                    android:color="#FF1B1714"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-        <!-- 朝：晨光 -->
-        <path android:pathData="M0,0 H24 V11.4 H0 Z">
+    <group>
+        <clip-path android:pathData="M12,4.4 A7.6,7.6 0 1,0 12,19.6 A7.6,7.6 0 1,0 12,4.4 Z" />
+
+        <!-- 朝：晨光（越靠地平线越亮） -->
+        <path android:pathData="M4.4,4.4 H19.6 V11.64 H4.4 Z">
             <aapt:attr name="android:fillColor">
                 <gradient
                     android:type="linear"
                     android:startX="12"
-                    android:startY="2.6"
+                    android:startY="4.4"
                     android:endX="12"
-                    android:endY="11.4">
+                    android:endY="11.64">
                     <item
-                        android:color="#FFD98A3A"
+                        android:color="#FFD9822B"
                         android:offset="0.0" />
                     <item
-                        android:color="#FFC87A2E"
+                        android:color="#FFF0B45F"
                         android:offset="1.0" />
                 </gradient>
             </aapt:attr>
         </path>
 
-        <!-- 夕：暮色 -->
-        <path android:pathData="M0,12.6 H24 V24 H0 Z">
+        <!-- 夕：暮色（越靠地平线越亮） -->
+        <path android:pathData="M4.4,12.36 H19.6 V19.6 H4.4 Z">
             <aapt:attr name="android:fillColor">
                 <gradient
                     android:type="linear"
                     android:startX="12"
-                    android:startY="12.6"
+                    android:startY="12.36"
                     android:endX="12"
-                    android:endY="21.4">
+                    android:endY="19.6">
                     <item
-                        android:color="#FF9E5570"
+                        android:color="#FFC86C82"
                         android:offset="0.0" />
                     <item
-                        android:color="#FF8A4A64"
+                        android:color="#FF8F4760"
                         android:offset="1.0" />
                 </gradient>
             </aapt:attr>

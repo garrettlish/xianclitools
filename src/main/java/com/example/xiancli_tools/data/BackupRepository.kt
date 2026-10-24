@@ -2,10 +2,15 @@ package com.example.xiancli_tools.data
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.content.FileProvider
+import java.io.File
 import java.io.FileNotFoundException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
- * 备份的落盘与恢复：把记事、记账、轨迹、专注记录、习惯、出行打包成单个 JSON 文件，
+ * 备份的落盘与恢复：把记事、记账、轨迹、专注记录、饮记、出行打包成单个 JSON 文件，
  * 或者从这样一个文件里把数据写回本地。
  *
  * 文件读写走 SAF（系统文件选择器）给出的 Uri，因此不需要任何存储权限。
@@ -17,16 +22,21 @@ class BackupRepository(context: Context) {
     private val ledgerRepository = LedgerRepository(appContext)
     private val trackRepository = TrackRepository(appContext)
     private val timerRepository = TimerSessionRepository(appContext)
-    private val habitRepository = HabitRepository(appContext)
+    private val drinkRepository = DrinkRepository(appContext)
     private val tripRepository = TripRepository(appContext)
 
+    /**
+     * 备份取的是**含墓碑**的全量数据。
+     * 只读「可见数据」会让删除传不到别的设备——对方那条记录会一直留着。
+     */
     fun snapshot(): BackupPayload = BackupPayload(
-        notes = noteRepository.loadNotes(),
-        records = ledgerRepository.loadRecords(),
-        sessions = trackRepository.loadSessions(),
-        timers = timerRepository.loadSessions(),
-        habits = habitRepository.loadHabits(),
-        trips = tripRepository.loadTrips()
+        notes = noteRepository.loadAllNotes(),
+        records = ledgerRepository.loadAllRecords(),
+        sessions = trackRepository.loadAllSessions(),
+        timers = timerRepository.loadAllSessions(),
+        drinkCategories = drinkRepository.loadAllCategories(),
+        drinkRecords = drinkRepository.loadAllRecords(),
+        trips = tripRepository.loadAllTrips()
     )
 
     /** 把当前全部数据写入指定 Uri，返回写出的内容。 */
@@ -47,6 +57,24 @@ class BackupRepository(context: Context) {
     }
 
     /**
+     * 把当前数据写进缓存目录，返回可以交给系统分享面板的 Uri。
+     *
+     * 走 FileProvider，接收方拿到的只是这一次的临时读权限；
+     * 文件留在应用缓存里（`cache/backup/`），系统空间紧张时会自己清掉。
+     */
+    fun writeShareFile(now: Long = System.currentTimeMillis()): Uri {
+        val dir = File(appContext.cacheDir, "backup").apply { mkdirs() }
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.CHINA).format(Date(now))
+        val file = File(dir, "朝夕备份-$stamp.json")
+        file.writeText(BackupCodec.encode(snapshot(), now), Charsets.UTF_8)
+        return FileProvider.getUriForFile(
+            appContext,
+            "${appContext.packageName}.fileprovider",
+            file
+        )
+    }
+
+    /**
      * 应用备份。[replaceExisting] 为 true 时清空现有数据后导入，
      * 否则按 id 合并、只补充新记录。
      */
@@ -56,7 +84,8 @@ class BackupRepository(context: Context) {
         ledgerRepository.replaceAll(target.records)
         trackRepository.replaceAll(target.sessions)
         timerRepository.replaceAll(target.timers)
-        habitRepository.replaceAll(target.habits)
+        drinkRepository.replaceAllCategories(target.drinkCategories)
+        drinkRepository.replaceAllRecords(target.drinkRecords)
         tripRepository.replaceAll(target.trips)
     }
 }

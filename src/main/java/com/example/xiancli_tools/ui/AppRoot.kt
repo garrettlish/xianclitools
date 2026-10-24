@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import com.example.xiancli_tools.data.BackupPayload
 import com.example.xiancli_tools.data.TrackSession
 
 private sealed interface Screen {
@@ -23,17 +24,27 @@ private sealed interface Screen {
     data object Ledger : Screen
     data object Track : Screen
     data class TrackMap(val sessions: List<TrackSession>) : Screen
-    data object Habit : Screen
+    data object Drink : Screen
     data object Trip : Screen
     data object Review : Screen
-    data object Backup : Screen
+
+    /** [incoming] 是从系统「用其他应用打开」带进来的备份，非空时进页就弹合并确认。 */
+    data class Backup(val incoming: BackupPayload? = null) : Screen
+    data object NearbySync : Screen
     data object NotificationSettings : Screen
 }
 
 @Composable
-fun AppRoot() {
+fun AppRoot(
+    incomingBackup: BackupPayload? = null,
+    onIncomingBackupConsumed: () -> Unit = {}
+) {
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     val context = LocalContext.current
+
+    LaunchedEffect(incomingBackup) {
+        if (incomingBackup != null) screen = Screen.Backup(incomingBackup)
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -54,6 +65,8 @@ fun AppRoot() {
         screen = when (screen) {
             Screen.NotificationSettings -> Screen.Timer
             is Screen.TrackMap -> Screen.Track
+            // 直传是从备份页进来的，返回时回到备份页，数据可能已经被同步过，正好重取一次。
+            Screen.NearbySync -> Screen.Backup()
             else -> Screen.Home
         }
     }
@@ -64,10 +77,10 @@ fun AppRoot() {
             onOpenNote = { screen = Screen.Note },
             onOpenLedger = { screen = Screen.Ledger },
             onOpenTrack = { screen = Screen.Track },
-            onOpenHabits = { screen = Screen.Habit },
+            onOpenDrink = { screen = Screen.Drink },
             onOpenTrip = { screen = Screen.Trip },
             onOpenReview = { screen = Screen.Review },
-            onOpenBackup = { screen = Screen.Backup }
+            onOpenBackup = { screen = Screen.Backup() }
         )
         Screen.Timer -> TimerScreen(
             onBack = { screen = Screen.Home },
@@ -87,7 +100,7 @@ fun AppRoot() {
             sessions = current.sessions,
             onBack = { screen = Screen.Track }
         )
-        Screen.Habit -> HabitScreen(
+        Screen.Drink -> DrinkScreen(
             onBack = { screen = Screen.Home }
         )
         Screen.Trip -> TripScreen(
@@ -96,10 +109,16 @@ fun AppRoot() {
         Screen.Review -> ReviewScreen(
             onBack = { screen = Screen.Home },
             onOpenNote = { screen = Screen.Note },
-            onOpenHabits = { screen = Screen.Habit }
+            onOpenDrink = { screen = Screen.Drink }
         )
-        Screen.Backup -> BackupScreen(
-            onBack = { screen = Screen.Home }
+        is Screen.Backup -> BackupScreen(
+            onBack = { screen = Screen.Home },
+            onOpenNearby = { screen = Screen.NearbySync },
+            incoming = current.incoming,
+            onIncomingConsumed = onIncomingBackupConsumed
+        )
+        Screen.NearbySync -> NearbySyncScreen(
+            onBack = { screen = Screen.Backup() }
         )
         Screen.NotificationSettings -> NotificationSettingsScreen(
             onBack = { screen = Screen.Timer }

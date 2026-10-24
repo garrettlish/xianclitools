@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.DateRanges
 import com.example.xiancli_tools.data.ExpenseRecord
+import com.example.xiancli_tools.data.Identity
 import com.example.xiancli_tools.data.LedgerRepository
 import com.example.xiancli_tools.data.Note
 import com.example.xiancli_tools.data.NoteRepository
@@ -115,7 +116,7 @@ fun TripScreen(onBack: () -> Unit) {
 
     fun save(name: String, startMillis: Long, endMillis: Long) {
         val trip = Trip(
-            id = System.currentTimeMillis(),
+            id = Identity.newId(),
             name = name.ifBlank { defaultTripName(startMillis) },
             startMillis = DateRanges.startOfDay(startMillis),
             endMillis = DateRanges.startOfDay(endMillis)
@@ -130,7 +131,7 @@ fun TripScreen(onBack: () -> Unit) {
 
     fun saveCandidate(candidate: TripCandidate) {
         val trip = Trip(
-            id = System.currentTimeMillis(),
+            id = Identity.newId(),
             name = candidate.name,
             startMillis = candidate.startMillis,
             endMillis = candidate.endMillis

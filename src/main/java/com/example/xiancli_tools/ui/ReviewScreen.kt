@@ -38,10 +38,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
+import com.example.xiancli_tools.data.DrinkCategory
+import com.example.xiancli_tools.data.DrinkRecord
+import com.example.xiancli_tools.data.DrinkRepository
 import com.example.xiancli_tools.data.ExpenseRecord
-import com.example.xiancli_tools.data.Habit
-import com.example.xiancli_tools.data.HabitAnalytics
-import com.example.xiancli_tools.data.HabitRepository
 import com.example.xiancli_tools.data.LedgerRepository
 import com.example.xiancli_tools.data.Note
 import com.example.xiancli_tools.data.NoteCategory
@@ -60,6 +60,7 @@ import com.example.xiancli_tools.ui.components.IconBadge
 import com.example.xiancli_tools.ui.components.MetricTile
 import com.example.xiancli_tools.ui.components.SectionCard
 import com.example.xiancli_tools.ui.components.SegmentedTabs
+import com.example.xiancli_tools.ui.components.parseHexColor
 import com.example.xiancli_tools.ui.theme.LedgerAccent
 import com.example.xiancli_tools.ui.theme.NoteAccent
 import com.example.xiancli_tools.ui.theme.StatsAccent
@@ -79,7 +80,7 @@ import kotlinx.coroutines.withContext
 fun ReviewScreen(
     onBack: () -> Unit,
     onOpenNote: () -> Unit,
-    onOpenHabits: () -> Unit
+    onOpenDrink: () -> Unit
 ) {
     val context = LocalContext.current
     var period by remember { mutableStateOf(ReviewPeriod.WEEK) }
@@ -87,7 +88,8 @@ fun ReviewScreen(
     var records by remember { mutableStateOf<List<ExpenseRecord>>(emptyList()) }
     var sessions by remember { mutableStateOf<List<TrackSession>>(emptyList()) }
     var timers by remember { mutableStateOf<List<TimerSession>>(emptyList()) }
-    var habits by remember { mutableStateOf<List<Habit>>(emptyList()) }
+    var drinks by remember { mutableStateOf<List<DrinkRecord>>(emptyList()) }
+    var drinkCategories by remember { mutableStateOf<List<DrinkCategory>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -95,18 +97,20 @@ fun ReviewScreen(
             records = LedgerRepository(context).loadRecords()
             sessions = TrackRepository(context).loadSessions()
             timers = TimerSessionRepository(context).loadSessions()
-            habits = HabitRepository(context).loadHabits()
+            val drinkRepository = DrinkRepository(context)
+            drinks = drinkRepository.loadRecords()
+            drinkCategories = drinkRepository.loadCategories()
         }
     }
 
-    val summary = remember(period, notes, records, sessions, timers, habits) {
+    val summary = remember(period, notes, records, sessions, timers, drinks) {
         ReviewAnalytics.summarize(
             period = period,
             notes = notes,
             records = records,
             tracks = sessions,
             timers = timers,
-            habits = habits
+            drinks = drinks
         )
     }
     val pendingTodos = remember(notes) {
@@ -179,10 +183,11 @@ fun ReviewScreen(
             )
             Spacer(Modifier.height(12.dp))
 
-            HabitSummaryCard(
-                habits = habits,
+            DrinkSummaryCard(
+                categories = drinkCategories,
                 summary = summary,
-                onOpenHabits = onOpenHabits
+                hasAnyRecord = drinks.isNotEmpty(),
+                onOpenDrink = onOpenDrink
             )
         }
     }
@@ -395,65 +400,63 @@ private fun TodoCard(
 }
 
 @Composable
-private fun HabitSummaryCard(
-    habits: List<Habit>,
+private fun DrinkSummaryCard(
+    categories: List<DrinkCategory>,
     summary: ReviewSummary,
-    onOpenHabits: () -> Unit
+    hasAnyRecord: Boolean,
+    onOpenDrink: () -> Unit
 ) {
-    SectionCard(title = "习惯") {
-        if (habits.isEmpty()) {
+    SectionCard(title = "饮记") {
+        if (!hasAnyRecord) {
             Text(
-                text = "还没有习惯，可以加一个每天想坚持的小事。",
+                text = "还没有记录，喝一杯就点一下。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(6.dp))
-            TextButton(onClick = onOpenHabits) {
-                Text("去添加")
+            TextButton(onClick = onOpenDrink) {
+                Text("去记录")
             }
             return@SectionCard
         }
-        val (done, total) = HabitAnalytics.todayProgress(habits)
         Text(
-            text = "今天 $done / $total",
+            text = "今天 ${summary.drinkTodayCount} 次 · ${summary.rangeName} ${summary.drinkCount} 次",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold
         )
-        Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            habits.filterNot { it.archived }.take(8).forEach { habit ->
-                val checked = HabitAnalytics.checkedToday(habit)
-                val accent = habitAccent(habit.iconKey)
-                Box(
+        if (summary.drinkTop.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            summary.drinkTop.take(4).forEach { (categoryId, count) ->
+                val category = categories.firstOrNull { it.id == categoryId }
+                val color = parseHexColor(category?.colorHex ?: "#9C948A")
+                Row(
                     modifier = Modifier
-                        .size(32.dp)
-                        .background(
-                            if (checked) accent.copy(alpha = 0.2f)
-                            else MaterialTheme.colorScheme.surfaceContainer,
-                            RoundedCornerShape(10.dp)
-                        ),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        painter = painterResource(habitIcon(habit.iconKey)),
-                        contentDescription = habit.name,
-                        tint = if (checked) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(9.dp)
+                            .background(color, RoundedCornerShape(3.dp))
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = category?.name ?: "已删除类别",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "$count 次",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = color
                     )
                 }
             }
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = "最长连续 ${habits.maxOfOrNull { HabitAnalytics.streak(it) } ?: 0} 天",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        TextButton(onClick = onOpenHabits) {
-            Text("去打卡")
+        TextButton(onClick = onOpenDrink) {
+            Text("去记录")
         }
     }
 }

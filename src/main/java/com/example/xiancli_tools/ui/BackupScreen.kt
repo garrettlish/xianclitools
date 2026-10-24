@@ -2,6 +2,7 @@ package com.example.xiancli_tools.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,9 +51,10 @@ import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.BackupPayload
 import com.example.xiancli_tools.data.BackupRepository
+import com.example.xiancli_tools.data.describe
+import com.example.xiancli_tools.ui.theme.DrinkAccent
 import com.example.xiancli_tools.ui.theme.LedgerAccent
 import com.example.xiancli_tools.ui.theme.MutedRose
-import com.example.xiancli_tools.ui.theme.MutedTeal
 import com.example.xiancli_tools.ui.theme.NoteAccent
 import com.example.xiancli_tools.ui.theme.TimerAccent
 import com.example.xiancli_tools.ui.theme.TrackAccent
@@ -65,7 +67,14 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BackupScreen(onBack: () -> Unit) {
+fun BackupScreen(
+    onBack: () -> Unit,
+    /** 进「附近直传」：同 Wi-Fi 下两台设备直接互传。 */
+    onOpenNearby: () -> Unit = {},
+    /** 从系统「用其他应用打开」带进来的备份，进来就弹合并确认。 */
+    incoming: BackupPayload? = null,
+    onIncomingConsumed: () -> Unit = {}
+) {
     val context = LocalContext.current
     val repository = remember { BackupRepository(context) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -77,6 +86,15 @@ fun BackupScreen(onBack: () -> Unit) {
 
     LaunchedEffect(Unit) {
         payload = withContext(Dispatchers.IO) { repository.snapshot() }
+    }
+
+    LaunchedEffect(incoming) {
+        if (incoming != null) {
+            // 先重新取一次本地数据，保证合并预览的数字基于当前状态。
+            payload = withContext(Dispatchers.IO) { repository.snapshot() }
+            pendingImport = incoming
+            onIncomingConsumed()
+        }
     }
 
     fun notify(message: String) {
@@ -95,9 +113,9 @@ fun BackupScreen(onBack: () -> Unit) {
             busy = false
             result.onSuccess { exported ->
                 notify(
-                    "已导出 ${exported.totalCount} 条：备忘 ${exported.notes.size} · " +
-                        "账本 ${exported.records.size} · 足迹 ${exported.sessions.size} · " +
-                        "专注 ${exported.timers.size} · 习惯 ${exported.habits.size}"
+                    "已导出 ${exported.visibleCount} 条：备忘 ${exported.visibleNotes} · " +
+                        "账本 ${exported.visibleRecords} · 足迹 ${exported.visibleSessions} · " +
+                        "专注 ${exported.visibleTimers} · 饮记 ${exported.visibleDrinkRecords}"
                 )
             }.onFailure { notify("导出失败：${it.message ?: "未知错误"}") }
         }
@@ -132,15 +150,38 @@ fun BackupScreen(onBack: () -> Unit) {
             busy = false
             result.onSuccess {
                 val message = if (replace) {
-                    "已覆盖导入 ${payload.totalCount} 条：备忘 ${payload.notes.size} · " +
-                        "账本 ${payload.records.size} · 足迹 ${payload.sessions.size} · " +
-                        "专注 ${payload.timers.size} · 习惯 ${payload.habits.size}"
+                    "已覆盖导入 ${payload.visibleCount} 条：备忘 ${payload.visibleNotes} · " +
+                        "账本 ${payload.visibleRecords} · 足迹 ${payload.visibleSessions} · " +
+                        "专注 ${payload.visibleTimers} · 饮记 ${payload.visibleDrinkRecords}"
                 } else {
-                    val added = incoming.newCountAgainst(before)
-                    "已合并导入：新增 $added 条，跳过 ${incoming.totalCount - added} 条"
+                    "已合并：${incoming.diffAgainst(before).describe()}"
                 }
                 notify(message)
             }.onFailure { notify("导入失败：${it.message ?: "未知错误"}") }
+        }
+    }
+
+    /**
+     * 走系统分享面板把备份发出去：面板里选微信、附近分享、蓝牙都行，
+     * 省掉「先存到下载目录，再自己去聊天软件里找文件」那几步。
+     */
+    fun shareBackup() {
+        scope.launch {
+            busy = true
+            val result = runCatching {
+                withContext(Dispatchers.IO) { repository.writeShareFile() }
+            }
+            busy = false
+            result.onSuccess { uri ->
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/json"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                runCatching {
+                    context.startActivity(Intent.createChooser(send, "发送备份到其他设备"))
+                }.onFailure { notify("没有可用的分享方式") }
+            }.onFailure { notify("生成备份失败：${it.message ?: "未知错误"}") }
         }
     }
 
@@ -173,7 +214,7 @@ fun BackupScreen(onBack: () -> Unit) {
         ) {
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "把备忘、账本和足迹打包成一个 JSON 文件；换手机或重装后导入即可恢复。",
+                text = "把备忘、账本、足迹、饮记等全部数据打包成一个 JSON 文件；换手机或重装后导入即可恢复。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -195,18 +236,50 @@ fun BackupScreen(onBack: () -> Unit) {
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(4.dp))
-                    CountRow("备忘", payload.notes.size, NoteAccent)
-                    CountRow("账本", payload.records.size, LedgerAccent)
-                    CountRow("足迹", payload.sessions.size, TrackAccent)
-                    CountRow("专注", payload.timers.size, TimerAccent)
-                    CountRow("习惯", payload.habits.size, MutedTeal)
-                    CountRow("出行", payload.trips.size, MutedRose)
+                    CountRow("备忘", payload.visibleNotes, NoteAccent)
+                    CountRow("账本", payload.visibleRecords, LedgerAccent)
+                    CountRow("足迹", payload.visibleSessions, TrackAccent)
+                    CountRow("专注", payload.visibleTimers, TimerAccent)
+                    CountRow("饮记", payload.visibleDrinkRecords, DrinkAccent)
+                    CountRow("出行", payload.visibleTrips, MutedRose)
                 }
             }
 
             Spacer(Modifier.height(20.dp))
 
             Button(
+                onClick = onOpenNearby,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_nearby),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("附近直传（同一 Wi-Fi）")
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = { shareBackup() },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_share),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("分享到其他设备")
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedButton(
                 onClick = {
                     exportLauncher.launch(
                         "朝夕备份-${SimpleDateFormat("yyyyMMdd-HHmm", Locale.CHINA).format(Date())}.json"
@@ -221,7 +294,7 @@ fun BackupScreen(onBack: () -> Unit) {
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("一键导出全部数据")
+                Text("导出为文件")
             }
 
             Spacer(Modifier.height(12.dp))
@@ -246,8 +319,16 @@ fun BackupScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "导出时会让你选择保存位置（如「下载」），文件只存在本机，不会上传。" +
-                    "导入时可以选择「合并」（保留现有数据、只补新记录）或「覆盖」（先清空再导入）。",
+                text = "「附近直传」要求两台设备连同一个 Wi-Fi：双方都打开该页面，点一下对方设备名即可，速度最快且不经过任何服务。" +
+                    "「分享到其他设备」走系统分享面板（微信、蓝牙都行），对方点开文件后选「用其他应用打开 → 朝夕」也能导入。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "文件只存在本机，不会上传到任何服务器。" +
+                    "导入时可以选「合并」（按修改时间取新，两边改动都会留下）" +
+                    "或「覆盖」（先清空再导入）。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -306,14 +387,13 @@ private fun ImportConfirmDialog(
         text = {
             Column {
                 Text(
-                    text = "文件中包含：备忘 ${incoming.notes.size} 条 · " +
-                        "账本 ${incoming.records.size} 条 · 足迹 ${incoming.sessions.size} 条。",
+                    text = "文件中包含：备忘 ${incoming.visibleNotes} 条 · " +
+                        "账本 ${incoming.visibleRecords} 条 · 足迹 ${incoming.visibleSessions} 条。",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "合并：保留现有数据，只补充新记录（预计新增 " +
-                        "${incoming.newCountAgainst(existing)} 条）。",
+                    text = "合并：两边按修改时间取新，${incoming.diffAgainst(existing).describe()}。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

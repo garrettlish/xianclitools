@@ -12,24 +12,42 @@ class TrackRepository(context: Context) {
     private val sessionsFile = File(appContext.filesDir, SESSIONS_FILE)
     private val activeFile = File(appContext.filesDir, ACTIVE_FILE)
 
+    /** 界面用的轨迹：墓碑不参与展示。 */
     @Synchronized
-    fun loadSessions(): List<TrackSession> = readSessions(sessionsFile)
+    fun loadSessions(): List<TrackSession> =
+        readSessions(sessionsFile).filter { it.deletedAt == null }
+
+    /** 含墓碑的全量，备份与合并必须用它，否则删除传不到别的设备。 */
+    @Synchronized
+    fun loadAllSessions(): List<TrackSession> = readSessions(sessionsFile)
 
     @Synchronized
     fun appendSession(session: TrackSession) {
         val sessions = readSessions(sessionsFile).toMutableList()
+        val previous = sessions.firstOrNull { it.id == session.id }
         sessions.removeAll { it.id == session.id }
-        sessions.add(session)
+        sessions.add(session.copy(updatedAt = nextStamp(previous?.updatedAt), deletedAt = null))
         writeSessions(sessionsFile, sessions.sortedByDescending { it.startMillis })
     }
 
     @Synchronized
     fun deleteSession(id: Long) {
-        val sessions = readSessions(sessionsFile).filterNot { it.id == id }
-        writeSessions(sessionsFile, sessions)
+        val sessions = readSessions(sessionsFile)
+        val stamp = nextStamp(sessions.firstOrNull { it.id == id }?.updatedAt)
+        // 墓碑只留骨架：轨迹点最占空间，删掉就没必要再跟着同步。
+        writeSessions(
+            sessionsFile,
+            sessions.map {
+                if (it.id == id) {
+                    it.copy(deletedAt = stamp, updatedAt = stamp, points = emptyList())
+                } else {
+                    it
+                }
+            }
+        )
     }
 
-    /** 用给定列表整体替换本地轨迹（导入备份时使用）。 */
+    /** 用给定列表整体替换本地轨迹（导入备份时使用）。墓碑要一并写入。 */
     @Synchronized
     fun replaceAll(sessions: List<TrackSession>) {
         writeSessions(sessionsFile, sessions.sortedByDescending { it.startMillis })
@@ -59,6 +77,10 @@ class TrackRepository(context: Context) {
             JsonCodec.sessionsFromJson(JSONArray(file.readText()))
         }.onFailure { Log.e(TAG, "读取轨迹失败", it) }.getOrDefault(emptyList())
     }
+
+    /** 修改时间戳；同一毫秒内改两次时强制比上一版大 1，保证先后可判。 */
+    private fun nextStamp(previous: Long?): Long =
+        maxOf(System.currentTimeMillis(), (previous ?: 0L) + 1L)
 
     private fun writeSessions(file: File, sessions: List<TrackSession>) {
         writeAtomically(file, JsonCodec.sessionsToJson(sessions).toString())

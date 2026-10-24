@@ -26,7 +26,14 @@ data class Note(
     val timeMillis: Long,
     val remindAt: Long? = null,
     val done: Boolean = false,
-    val moodLevel: Int? = null
+    val moodLevel: Int? = null,
+    /**
+     * 最后修改时间，多设备合并时比新旧（大者胜）。
+     * 默认取记录本身的时间，这样从旧数据升级上来的记录不会「显得比谁都新」。
+     */
+    val updatedAt: Long = timeMillis,
+    /** 删除墓碑：非空表示已删。留着墓碑是为了让删除也能同步到别的设备。 */
+    val deletedAt: Long? = null
 ) {
     val hasPendingReminder: Boolean
         get() = remindAt != null && remindAt > System.currentTimeMillis()

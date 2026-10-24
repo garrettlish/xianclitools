@@ -26,7 +26,11 @@ data class TrackSession(
     val startMillis: Long,
     val endMillis: Long,
     val distanceMeters: Double,
-    val points: List<TrackPoint>
+    val points: List<TrackPoint>,
+    /** 最后修改时间，多设备合并时比新旧（大者胜）。 */
+    val updatedAt: Long = endMillis,
+    /** 删除墓碑：非空表示已删。删掉轨迹时会把 points 清空，只留墓碑骨架。 */
+    val deletedAt: Long? = null
 ) {
     val durationMillis: Long
         get() = when {

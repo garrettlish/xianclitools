@@ -15,7 +15,11 @@ data class Trip(
     val startMillis: Long,
     /** 结束自然日零点（含当天）。 */
     val endMillis: Long,
-    val note: String = ""
+    val note: String = "",
+    /** 最后修改时间，多设备合并时比新旧（大者胜）。 */
+    val updatedAt: Long = endMillis,
+    /** 删除墓碑：非空表示已删。 */
+    val deletedAt: Long? = null
 ) {
     val range: DateRange
         get() = DateRange(startMillis, DateRanges.plusDays(endMillis, 1))

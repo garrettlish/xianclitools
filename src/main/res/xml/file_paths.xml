@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  分享备份文件时，只把 cache/backup 这一个目录暴露给 FileProvider。
+  导出的临时文件放这里，发完由系统随缓存清理，不进用户可见的存储。
+-->
+<paths>
+    <cache-path
+        name="backup"
+        path="backup/" />
+</paths>

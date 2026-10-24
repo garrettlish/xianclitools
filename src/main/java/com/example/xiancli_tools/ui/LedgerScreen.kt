@@ -55,6 +55,7 @@ import com.example.xiancli_tools.data.DateRange
 import com.example.xiancli_tools.data.DateRanges
 import com.example.xiancli_tools.data.ExpenseCategory
 import com.example.xiancli_tools.data.ExpenseRecord
+import com.example.xiancli_tools.data.Identity
 import com.example.xiancli_tools.data.LedgerAnalytics
 import com.example.xiancli_tools.data.LedgerPeriod
 import com.example.xiancli_tools.data.LedgerRepository
@@ -128,7 +129,7 @@ fun LedgerScreen(onBack: () -> Unit) {
             return
         }
         val record = ExpenseRecord(
-            id = System.currentTimeMillis(),
+            id = Identity.newId(),
             category = selectedCategory,
             amountCents = cents,
             note = note.trim(),

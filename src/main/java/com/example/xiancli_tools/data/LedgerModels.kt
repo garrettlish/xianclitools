@@ -20,7 +20,11 @@ data class ExpenseRecord(
     val category: ExpenseCategory,
     val amountCents: Long,
     val note: String,
-    val timeMillis: Long
+    val timeMillis: Long,
+    /** 最后修改时间，多设备合并时比新旧（大者胜）。 */
+    val updatedAt: Long = timeMillis,
+    /** 删除墓碑：非空表示已删。 */
+    val deletedAt: Long? = null
 )
 
 enum class LedgerPeriod(val label: String) {

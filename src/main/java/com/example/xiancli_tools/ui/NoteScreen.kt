@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.DateRange
 import com.example.xiancli_tools.data.DateRanges
+import com.example.xiancli_tools.data.Identity
 import com.example.xiancli_tools.data.MoodLevels
 import com.example.xiancli_tools.data.Note
 import com.example.xiancli_tools.data.NoteAnalytics
@@ -178,7 +179,7 @@ fun NoteScreen(onBack: () -> Unit) {
         // 已经过去的时间不值得再排闹钟，顺手丢掉，避免存成「永远不响的提醒」。
         val normalizedRemindAt = remindAt?.takeIf { it > System.currentTimeMillis() }
         val note = Note(
-            id = editingId ?: System.currentTimeMillis(),
+            id = editingId ?: Identity.newId(),
             category = selectedCategory,
             content = text,
             timeMillis = entryTime,

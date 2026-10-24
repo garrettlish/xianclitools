@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">朝夕</string>
+    <!-- 系统「用其他应用打开」列表里显示的名字，说明点进去是导入备份。 -->
+    <string name="import_backup_label">导入朝夕备份</string>
 </resources>

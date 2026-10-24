@@ -1,7 +1,6 @@
 package com.example.xiancli_tools.reminder
 
 import android.content.Context
-import com.example.xiancli_tools.data.HabitRepository
 import com.example.xiancli_tools.data.NoteRepository
 import com.example.xiancli_tools.data.SettingsRepository
 import com.example.xiancli_tools.timer.TimerScheduler
@@ -20,7 +19,6 @@ object ReminderRestorer {
         val now = System.currentTimeMillis()
         restoreTimer(appContext, now)
         restoreNotes(appContext, now)
-        restoreHabits(appContext)
     }
 
     private fun restoreTimer(context: Context, now: Long) {
@@ -43,15 +41,6 @@ object ReminderRestorer {
             val remindAt = note.remindAt
             if (remindAt != null && remindAt > now && !note.done) {
                 ReminderScheduler.scheduleNote(context, note.id, remindAt, note.content)
-            }
-        }
-    }
-
-    private fun restoreHabits(context: Context) {
-        HabitRepository(context).loadHabits().forEach { habit ->
-            val minute = habit.reminderMinuteOfDay
-            if (!habit.archived && minute != null) {
-                ReminderScheduler.scheduleHabit(context, habit.id, minute, habit.name)
             }
         }
     }

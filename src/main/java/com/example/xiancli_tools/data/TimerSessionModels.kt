@@ -16,7 +16,11 @@ data class TimerSession(
     val plannedMillis: Long,
     val startMillis: Long,
     val endMillis: Long,
-    val completed: Boolean
+    val completed: Boolean,
+    /** 最后修改时间，多设备合并时比新旧（大者胜）。 */
+    val updatedAt: Long = endMillis,
+    /** 删除墓碑：非空表示已删。 */
+    val deletedAt: Long? = null
 ) {
     val actualMillis: Long
         get() = (endMillis - startMillis).coerceAtLeast(0L)

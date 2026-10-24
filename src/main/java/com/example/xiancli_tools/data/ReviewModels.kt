@@ -30,8 +30,11 @@ data class ReviewSummary(
     val focusMillis: Long,
     val timerCount: Int,
     val timerCompletedCount: Int,
-    val habitDone: Int,
-    val habitTotal: Int,
+    /** 区间内饮记的次数，以及其中发生在「今天」的部分。 */
+    val drinkCount: Int,
+    val drinkTodayCount: Int,
+    /** 喝得最多的几类：类别 id + 次数，已按次数倒序。 */
+    val drinkTop: List<Pair<Long, Int>>,
     val activeDays: Int
 ) {
     val rangeName: String
@@ -49,7 +52,8 @@ data class ReviewSummary(
 
     /** 有没有值得说一句的内容。 */
     val isEmpty: Boolean
-        get() = expenseCount == 0 && noteCount == 0 && trackCount == 0 && timerCount == 0
+        get() = expenseCount == 0 && noteCount == 0 && trackCount == 0 &&
+            timerCount == 0 && drinkCount == 0
 }
 
 object ReviewAnalytics {
@@ -67,7 +71,7 @@ object ReviewAnalytics {
         records: List<ExpenseRecord>,
         tracks: List<TrackSession>,
         timers: List<TimerSession>,
-        habits: List<Habit>,
+        drinks: List<DrinkRecord>,
         now: Long = System.currentTimeMillis()
     ): ReviewSummary {
         val range = rangeOf(period, now)
@@ -77,6 +81,7 @@ object ReviewAnalytics {
         val periodNotes = notes.filter { inRange(it.timeMillis) }
         val periodTracks = tracks.filter { inRange(it.startMillis) }
         val periodTimers = timers.filter { inRange(it.startMillis) }
+        val periodDrinks = drinks.filter { inRange(it.timeMillis) }
 
         val categories = periodRecords
             .groupBy { it.category }
@@ -84,13 +89,20 @@ object ReviewAnalytics {
             .sortedByDescending { it.second }
 
         val todos = periodNotes.filter { it.category == NoteCategory.TODO }
-        val activeHabits = habits.filterNot { it.archived }
-        val habitDone = activeHabits.count { HabitAnalytics.checkedToday(it, now) }
+        val drinkTop = periodDrinks
+            .groupingBy { it.categoryId }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .map { (id, count) -> id to count }
+        val today = DateRanges.day(now)
+        val drinkTodayCount = drinks.count { it.timeMillis in today.startMillis until today.endMillis }
 
         val activeDays = (periodNotes.map { DateRanges.dayKey(it.timeMillis) } +
             periodRecords.map { DateRanges.dayKey(it.timeMillis) } +
             periodTracks.map { DateRanges.dayKey(it.startMillis) } +
-            periodTimers.map { DateRanges.dayKey(it.startMillis) })
+            periodTimers.map { DateRanges.dayKey(it.startMillis) } +
+            periodDrinks.map { DateRanges.dayKey(it.timeMillis) })
             .distinct()
             .size
 
@@ -110,15 +122,16 @@ object ReviewAnalytics {
             focusMillis = periodTimers.sumOf { it.focusMillis },
             timerCount = periodTimers.size,
             timerCompletedCount = periodTimers.count { it.completed },
-            habitDone = habitDone,
-            habitTotal = activeHabits.size,
+            drinkCount = periodDrinks.size,
+            drinkTodayCount = drinkTodayCount,
+            drinkTop = drinkTop,
             activeDays = activeDays
         )
     }
 
     /** 一句话总结：优先说钱，其次说专注，最后兜底一句鼓励。 */
     fun headline(summary: ReviewSummary): String {
-        if (summary.isEmpty && summary.pendingTodoCount == 0 && summary.habitTotal == 0) {
+        if (summary.isEmpty && summary.pendingTodoCount == 0) {
             return "${summary.rangeName}还没有记录，随手记一笔就算开工。"
         }
         val parts = mutableListOf<String>()
@@ -136,17 +149,19 @@ object ReviewAnalytics {
         if (summary.trackCount > 0) {
             parts += "走了 ${TrackAnalytics.formatDistance(summary.distanceMeters)}"
         }
+        if (summary.drinkCount > 0) {
+            parts += "喝了 ${summary.drinkCount} 次"
+        }
         if (summary.noteCount > 0) {
             parts += "记了 ${summary.noteCount} 条"
         }
         if (parts.isEmpty()) {
             return "${summary.rangeName}还没有记录，随手记一笔就算开工。"
         }
-        val tail = when {
-            summary.pendingTodoCount > 0 -> "，还有 ${summary.pendingTodoCount} 条待办没清"
-            summary.habitTotal > 0 && summary.habitDone == summary.habitTotal -> "，习惯全部打完卡了"
-            summary.habitTotal > 0 -> "，习惯完成 ${summary.habitDone}/${summary.habitTotal}"
-            else -> ""
+        val tail = if (summary.pendingTodoCount > 0) {
+            "，还有 ${summary.pendingTodoCount} 条待办没清"
+        } else {
+            ""
         }
         return parts.joinToString("，") + tail + "。"
     }

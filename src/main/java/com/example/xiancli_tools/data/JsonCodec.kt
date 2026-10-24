@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * 记事 / 记账 / 轨迹的统一 JSON 编解码。
+ * 记事 / 记账 / 轨迹 / 专注 / 饮记 / 出行的统一 JSON 编解码。
  *
  * 本地存储文件与导出的备份文件共用同一套字段，避免两处格式各自演化：
  * 字段只在这里改一次，本地读写与导入导出同时生效。
@@ -19,6 +19,8 @@ object JsonCodec {
         .put("remindAt", note.remindAt ?: 0L)
         .put("done", note.done)
         .put("mood", note.moodLevel ?: 0)
+        .put("updatedAt", note.updatedAt)
+        .put("deletedAt", note.deletedAt ?: 0L)
 
     fun noteFromJson(json: JSONObject): Note {
         val category = runCatching {
@@ -32,7 +34,10 @@ object JsonCodec {
             // schema 1 的备份文件没有这三个字段，opt 系列会给出默认值，正好兼容。
             remindAt = json.optLong("remindAt", 0L).takeIf { it > 0L },
             done = json.optBoolean("done", false),
-            moodLevel = MoodLevels.sanitize(json.optInt("mood", 0))
+            moodLevel = MoodLevels.sanitize(json.optInt("mood", 0)),
+            // schema 3 之前没有这两个字段：修改时间回退到记录时间，删除态视为未删除。
+            updatedAt = json.optLong("updatedAt", 0L).takeIf { it > 0L } ?: json.optLong("time"),
+            deletedAt = json.optLong("deletedAt", 0L).takeIf { it > 0L }
         )
     }
 
@@ -42,6 +47,8 @@ object JsonCodec {
         .put("amount", record.amountCents)
         .put("note", record.note)
         .put("time", record.timeMillis)
+        .put("updatedAt", record.updatedAt)
+        .put("deletedAt", record.deletedAt ?: 0L)
 
     fun recordFromJson(json: JSONObject): ExpenseRecord {
         val category = runCatching {
@@ -52,7 +59,9 @@ object JsonCodec {
             category = category,
             amountCents = json.optLong("amount"),
             note = json.optString("note"),
-            timeMillis = json.optLong("time")
+            timeMillis = json.optLong("time"),
+            updatedAt = json.optLong("updatedAt", 0L).takeIf { it > 0L } ?: json.optLong("time"),
+            deletedAt = json.optLong("deletedAt", 0L).takeIf { it > 0L }
         )
     }
 
@@ -73,6 +82,8 @@ object JsonCodec {
             .put("end", session.endMillis)
             .put("distance", session.distanceMeters)
             .put("points", points)
+            .put("updatedAt", session.updatedAt)
+            .put("deletedAt", session.deletedAt ?: 0L)
     }
 
     fun sessionFromJson(json: JSONObject): TrackSession {
@@ -98,7 +109,9 @@ object JsonCodec {
             startMillis = json.optLong("start"),
             endMillis = json.optLong("end"),
             distanceMeters = json.optDouble("distance"),
-            points = points
+            points = points,
+            updatedAt = json.optLong("updatedAt", 0L).takeIf { it > 0L } ?: json.optLong("end"),
+            deletedAt = json.optLong("deletedAt", 0L).takeIf { it > 0L }
         )
     }
 
@@ -147,6 +160,8 @@ object JsonCodec {
         .put("start", session.startMillis)
         .put("end", session.endMillis)
         .put("completed", session.completed)
+        .put("updatedAt", session.updatedAt)
+        .put("deletedAt", session.deletedAt ?: 0L)
 
     fun timerSessionFromJson(json: JSONObject): TimerSession = TimerSession(
         id = json.optLong("id"),
@@ -154,7 +169,9 @@ object JsonCodec {
         plannedMillis = json.optLong("planned"),
         startMillis = json.optLong("start"),
         endMillis = json.optLong("end"),
-        completed = json.optBoolean("completed", false)
+        completed = json.optBoolean("completed", false),
+        updatedAt = json.optLong("updatedAt", 0L).takeIf { it > 0L } ?: json.optLong("end"),
+        deletedAt = json.optLong("deletedAt", 0L).takeIf { it > 0L }
     )
 
     fun timerSessionsToJson(sessions: List<TimerSession>): JSONArray {
@@ -169,51 +186,73 @@ object JsonCodec {
         }
     }
 
-    // ---- 习惯 ----
+    // ---- 饮记 ----
 
-    fun habitToJson(habit: Habit): JSONObject {
-        val days = JSONArray()
-        habit.checkInDays.forEach { days.put(it) }
-        return JSONObject()
-            .put("id", habit.id)
-            .put("name", habit.name)
-            .put("icon", habit.iconKey)
-            .put("created", habit.createdMillis)
-            .put("days", days)
-            .put("reminder", habit.reminderMinuteOfDay ?: -1)
-            .put("archived", habit.archived)
-    }
+    fun drinkCategoryToJson(category: DrinkCategory): JSONObject = JSONObject()
+        .put("id", category.id)
+        .put("name", category.name)
+        .put("color", category.colorHex)
+        .put("created", category.createdMillis)
+        .put("updatedAt", category.updatedAt)
+        .put("deletedAt", category.deletedAt ?: 0L)
 
-    fun habitFromJson(json: JSONObject): Habit {
-        val daysArray = json.optJSONArray("days") ?: JSONArray()
-        val days = buildList {
-            for (index in 0 until daysArray.length()) {
-                val value = daysArray.optString(index)
-                if (value.isNotBlank()) add(value)
-            }
-        }
-        return Habit(
+    fun drinkCategoryFromJson(json: JSONObject): DrinkCategory =
+        DrinkCategory(
             id = json.optLong("id"),
             name = json.optString("name"),
-            iconKey = json.optString("icon", "custom"),
+            colorHex = sanitizeColorHex(json.optString("color")),
             createdMillis = json.optLong("created"),
-            checkInDays = days.distinct().sortedDescending(),
-            reminderMinuteOfDay = json.optInt("reminder", -1).takeIf { it in 0..1439 },
-            archived = json.optBoolean("archived", false)
+            updatedAt = json.optLong("updatedAt", 0L).takeIf { it > 0L }
+                ?: json.optLong("created"),
+            deletedAt = json.optLong("deletedAt", 0L).takeIf { it > 0L }
         )
-    }
 
-    fun habitsToJson(habits: List<Habit>): JSONArray {
+    fun drinkCategoriesToJson(categories: List<DrinkCategory>): JSONArray {
         val array = JSONArray()
-        habits.forEach { array.put(habitToJson(it)) }
+        categories.forEach { array.put(drinkCategoryToJson(it)) }
         return array
     }
 
-    fun habitsFromJson(array: JSONArray): List<Habit> = buildList {
+    fun drinkCategoriesFromJson(array: JSONArray): List<DrinkCategory> = buildList {
         for (index in 0 until array.length()) {
-            array.optJSONObject(index)?.let { add(habitFromJson(it)) }
+            array.optJSONObject(index)?.let { add(drinkCategoryFromJson(it)) }
         }
     }
+
+    fun drinkRecordToJson(record: DrinkRecord): JSONObject = JSONObject()
+        .put("id", record.id)
+        .put("categoryId", record.categoryId)
+        .put("time", record.timeMillis)
+        .put("updatedAt", record.updatedAt)
+        .put("deletedAt", record.deletedAt ?: 0L)
+
+    fun drinkRecordFromJson(json: JSONObject): DrinkRecord =
+        DrinkRecord(
+            id = json.optLong("id"),
+            categoryId = json.optLong("categoryId"),
+            timeMillis = json.optLong("time"),
+            updatedAt = json.optLong("updatedAt", 0L).takeIf { it > 0L } ?: json.optLong("time"),
+            deletedAt = json.optLong("deletedAt", 0L).takeIf { it > 0L }
+        )
+
+    fun drinkRecordsToJson(records: List<DrinkRecord>): JSONArray {
+        val array = JSONArray()
+        records.forEach { array.put(drinkRecordToJson(it)) }
+        return array
+    }
+
+    fun drinkRecordsFromJson(array: JSONArray): List<DrinkRecord> = buildList {
+        for (index in 0 until array.length()) {
+            array.optJSONObject(index)?.let { add(drinkRecordFromJson(it)) }
+        }
+    }
+
+    /** 颜色只能是 #RRGGBB，坏值回退成暖灰，别让一条脏数据把整页刷成黑块。 */
+    private fun sanitizeColorHex(raw: String): String =
+        if (COLOR_PATTERN.matches(raw)) raw else FALLBACK_COLOR
+
+    private val COLOR_PATTERN = Regex("^#[0-9A-Fa-f]{6}$")
+    private const val FALLBACK_COLOR = "#9C948A"
 
     // ---- 出行 ----
 
@@ -223,13 +262,17 @@ object JsonCodec {
         .put("start", trip.startMillis)
         .put("end", trip.endMillis)
         .put("note", trip.note)
+        .put("updatedAt", trip.updatedAt)
+        .put("deletedAt", trip.deletedAt ?: 0L)
 
     fun tripFromJson(json: JSONObject): Trip = Trip(
         id = json.optLong("id"),
         name = json.optString("name"),
         startMillis = json.optLong("start"),
         endMillis = json.optLong("end"),
-        note = json.optString("note")
+        note = json.optString("note"),
+        updatedAt = json.optLong("updatedAt", 0L).takeIf { it > 0L } ?: json.optLong("end"),
+        deletedAt = json.optLong("deletedAt", 0L).takeIf { it > 0L }
     )
 
     fun tripsToJson(trips: List<Trip>): JSONArray {

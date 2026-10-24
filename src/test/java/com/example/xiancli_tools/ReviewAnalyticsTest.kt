@@ -1,9 +1,8 @@
 package com.example.xiancli_tools
 
-import com.example.xiancli_tools.data.DateRanges
+import com.example.xiancli_tools.data.DrinkRecord
 import com.example.xiancli_tools.data.ExpenseCategory
 import com.example.xiancli_tools.data.ExpenseRecord
-import com.example.xiancli_tools.data.Habit
 import com.example.xiancli_tools.data.Note
 import com.example.xiancli_tools.data.NoteCategory
 import com.example.xiancli_tools.data.ReviewAnalytics
@@ -53,14 +52,10 @@ class ReviewAnalyticsTest {
         val timers = listOf(
             TimerSession(1L, "25 分钟", 25 * minute, at(10, 21), at(10, 21) + 25 * minute, true)
         )
-        val habits = listOf(
-            Habit(
-                id = 1L,
-                name = "喝水",
-                iconKey = "water",
-                createdMillis = at(10, 1),
-                checkInDays = listOf(DateRanges.dayKey(now))
-            )
+        val drinks = listOf(
+            DrinkRecord(id = 1L, categoryId = 7L, timeMillis = at(10, 20)),
+            DrinkRecord(id = 2L, categoryId = 7L, timeMillis = at(10, 22)),
+            DrinkRecord(id = 3L, categoryId = 7L, timeMillis = at(10, 24, hour = 9))
         )
 
         val summary = ReviewAnalytics.summarize(
@@ -69,7 +64,7 @@ class ReviewAnalyticsTest {
             records = records,
             tracks = tracks,
             timers = timers,
-            habits = habits,
+            drinks = drinks,
             now = now
         )
 
@@ -82,8 +77,9 @@ class ReviewAnalyticsTest {
         assertEquals(1, summary.pendingTodoCount)
         assertEquals(1_200.0, summary.distanceMeters, 0.01)
         assertEquals(25 * minute, summary.focusMillis)
-        assertEquals(1, summary.habitDone)
-        assertEquals(1, summary.habitTotal)
+        assertEquals(3, summary.drinkCount)
+        assertEquals("今天只算落在当天的记录", 1, summary.drinkTodayCount)
+        assertEquals(7L to 3, summary.drinkTop.first())
     }
 
     @Test
@@ -94,7 +90,7 @@ class ReviewAnalyticsTest {
             records = listOf(ExpenseRecord(1L, ExpenseCategory.FOOD, 2_000L, "", at(10, 24))),
             tracks = emptyList(),
             timers = emptyList(),
-            habits = emptyList(),
+            drinks = emptyList(),
             now = now
         )
 
@@ -112,7 +108,7 @@ class ReviewAnalyticsTest {
             records = emptyList(),
             tracks = emptyList(),
             timers = emptyList(),
-            habits = emptyList(),
+            drinks = emptyList(),
             now = now
         )
 
