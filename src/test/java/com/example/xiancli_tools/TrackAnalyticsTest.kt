@@ -65,6 +65,22 @@ class TrackAnalyticsTest {
         assertEquals(15, calendar.get(Calendar.DAY_OF_MONTH))
     }
 
+    @Test
+    fun week_trend_places_distance_on_weekday_bucket() {
+        // 趋势按轨迹的「开始时间」归桶，桶里累加里程而不是次数。
+        val now = millisOf(2026, Calendar.JUNE, 17, 12, 0)
+        val wednesday = session(TransportMode.WALK, millisOf(2026, Calendar.JUNE, 17, 9, 0), 2500.0)
+        val thursday = session(TransportMode.BIKE, millisOf(2026, Calendar.JUNE, 18, 9, 0), 7500.0)
+
+        val summary = TrackAnalytics.summarize(listOf(wednesday, thursday), TrackPeriod.WEEK, now)
+        val trend = TrackAnalytics.trend(summary)
+
+        assertEquals(7, trend.size)
+        assertEquals(2500.0, trend[2].distanceMeters, 0.001)
+        assertEquals(7500.0, trend[3].distanceMeters, 0.001)
+        assertEquals(0.0, trend[0].distanceMeters, 0.001)
+    }
+
     private fun session(mode: TransportMode, startMillis: Long, meters: Double) = TrackBrief(
         id = startMillis,
         mode = mode,

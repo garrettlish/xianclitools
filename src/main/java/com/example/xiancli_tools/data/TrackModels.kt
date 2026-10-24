@@ -1,5 +1,6 @@
 package com.example.xiancli_tools.data
 
+import java.util.Calendar
 import java.util.Locale
 import kotlin.math.asin
 import kotlin.math.cos
@@ -84,6 +85,8 @@ data class ModeSummary(
     val sessionCount: Int
 )
 
+data class TrackTrendBucket(val label: String, val distanceMeters: Double)
+
 data class PeriodSummary(
     val period: TrackPeriod,
     val startMillis: Long,
@@ -96,6 +99,14 @@ data class PeriodSummary(
     /** 报表标题用词：本日 / 本周 / 本月 / 本年 / 所选区间。 */
     val rangeName: String
         get() = if (period == TrackPeriod.CUSTOM) "所选区间" else "本${period.label}"
+
+    /** 趋势峰值描述用词：单日最高 / 单周最高 / 单月最高 / 单年最高。 */
+    val peakLabel: String
+        get() = if (period == TrackPeriod.CUSTOM) {
+            "单${TrendBuckets.plan(range).unit.label}最高"
+        } else {
+            "单${period.label}最高"
+        }
 
     val totalDistanceMeters: Double
         get() = sessions.sumOf { it.distanceMeters }
@@ -156,6 +167,69 @@ object TrackAnalytics {
     }
 
     fun startOfPeriod(period: TrackPeriod, now: Long): Long = rangeOf(period, now).startMillis
+
+    /** 每个时间桶里的总里程：日按小时、周按天、月按日、年按月，自定义交给 [TrendBuckets]。 */
+    fun trend(summary: PeriodSummary): List<TrackTrendBucket> {
+        val calendar = Calendar.getInstance()
+        return when (summary.period) {
+            TrackPeriod.DAY -> {
+                val buckets = DoubleArray(24)
+                summary.sessions.forEach { session ->
+                    calendar.timeInMillis = session.startMillis
+                    buckets[calendar.get(Calendar.HOUR_OF_DAY)] += session.distanceMeters
+                }
+                (0..23).map { hour ->
+                    TrackTrendBucket(if (hour % 6 == 0) "${hour}时" else "", buckets[hour])
+                }
+            }
+            TrackPeriod.WEEK -> {
+                val buckets = DoubleArray(7)
+                summary.sessions.forEach { session ->
+                    calendar.timeInMillis = session.startMillis
+                    val dayFromMonday = (calendar.get(Calendar.DAY_OF_WEEK) + 5) % 7
+                    buckets[dayFromMonday] += session.distanceMeters
+                }
+                val labels = listOf("一", "二", "三", "四", "五", "六", "日")
+                (0..6).map { TrackTrendBucket(labels[it], buckets[it]) }
+            }
+            TrackPeriod.MONTH -> {
+                val days = daysInMonth(summary.startMillis)
+                val buckets = DoubleArray(days)
+                summary.sessions.forEach { session ->
+                    calendar.timeInMillis = session.startMillis
+                    val index = calendar.get(Calendar.DAY_OF_MONTH) - 1
+                    if (index in buckets.indices) buckets[index] += session.distanceMeters
+                }
+                (0 until days).map { index ->
+                    val day = index + 1
+                    TrackTrendBucket(if (day == 1 || day % 5 == 0) "$day" else "", buckets[index])
+                }
+            }
+            TrackPeriod.YEAR -> {
+                val buckets = DoubleArray(12)
+                summary.sessions.forEach { session ->
+                    calendar.timeInMillis = session.startMillis
+                    buckets[calendar.get(Calendar.MONTH)] += session.distanceMeters
+                }
+                (0..11).map { TrackTrendBucket("${it + 1}月", buckets[it]) }
+            }
+            TrackPeriod.CUSTOM -> {
+                val plan = TrendBuckets.plan(summary.range)
+                val buckets = DoubleArray(plan.size)
+                summary.sessions.forEach { session ->
+                    val index = plan.indexOf(session.startMillis)
+                    if (index in buckets.indices) buckets[index] += session.distanceMeters
+                }
+                plan.labels.mapIndexed { index, label ->
+                    TrackTrendBucket(label, buckets[index])
+                }
+            }
+        }
+    }
+
+    private fun daysInMonth(millis: Long): Int = Calendar.getInstance().apply {
+        timeInMillis = millis
+    }.getActualMaximum(Calendar.DAY_OF_MONTH)
 
     fun formatDistance(meters: Double): String = when {
         meters <= 0 -> "0 米"

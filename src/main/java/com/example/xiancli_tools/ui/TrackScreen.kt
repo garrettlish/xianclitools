@@ -62,10 +62,13 @@ import com.example.xiancli_tools.data.TrackAnalytics
 import com.example.xiancli_tools.data.TrackBrief
 import com.example.xiancli_tools.data.TrackPeriod
 import com.example.xiancli_tools.data.TrackRepository
+import com.example.xiancli_tools.data.TrackTrendBucket
 import com.example.xiancli_tools.data.TransportMode
 import com.example.xiancli_tools.track.RecorderSnapshot
 import com.example.xiancli_tools.track.TrackRecorderService
 import com.example.xiancli_tools.track.TrackRecorderState
+import com.example.xiancli_tools.ui.components.BarChart
+import com.example.xiancli_tools.ui.components.BarDatum
 import com.example.xiancli_tools.ui.components.ChartSlice
 import com.example.xiancli_tools.ui.components.ConfirmDeleteDialog
 import com.example.xiancli_tools.ui.components.CustomRangeBar
@@ -568,6 +571,33 @@ private fun SummaryContent(summary: PeriodSummary) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TotalsCard(summary)
         ModeBreakdownCard(summary)
+        TrendCard(summary)
+    }
+}
+
+/** 每个时间桶里的总里程，画图时换成公里做纵轴单位。 */
+@Composable
+private fun TrendCard(summary: PeriodSummary) {
+    val trend = remember(summary) { TrackAnalytics.trend(summary) }
+
+    SectionCard(title = "足迹趋势") {
+        BarChart(
+            bars = trend.map {
+                BarDatum(it.label, (it.distanceMeters / 1000.0).toFloat())
+            },
+            color = TrackAccent
+        )
+        Spacer(Modifier.height(8.dp))
+        val peak = trend.maxByOrNull { it.distanceMeters }
+        Text(
+            text = if (peak == null || peak.distanceMeters <= 0.0) {
+                "${summary.rangeName}还没有轨迹记录"
+            } else {
+                "${summary.peakLabel} ${TrackAnalytics.formatDistance(peak.distanceMeters)}"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
