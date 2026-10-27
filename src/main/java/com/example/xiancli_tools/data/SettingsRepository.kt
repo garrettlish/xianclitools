@@ -3,6 +3,12 @@ package com.example.xiancli_tools.data
 import android.content.Context
 import android.net.Uri
 
+/**
+ * 亮暗主题偏好。默认 [SYSTEM] 跟随系统；用户点过首页的切换按钮后就记住他的选择，
+ * 不再跟着系统的日夜开关跳变。
+ */
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
 class SettingsRepository(context: Context) {
 
     private val prefs = context.applicationContext
@@ -19,6 +25,12 @@ class SettingsRepository(context: Context) {
     var ringtoneTitle: String?
         get() = prefs.getString(KEY_RINGTONE_TITLE, null)
         set(value) = prefs.edit().putString(KEY_RINGTONE_TITLE, value).apply()
+
+    var themeMode: ThemeMode
+        get() = prefs.getString(KEY_THEME_MODE, null)
+            ?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } }
+            ?: ThemeMode.SYSTEM
+        set(value) = prefs.edit().putString(KEY_THEME_MODE, value.name).apply()
 
     var scheduledEndAt: Long
         get() = prefs.getLong(KEY_SCHEDULED_END_AT, 0L)
@@ -49,6 +61,7 @@ class SettingsRepository(context: Context) {
         const val KEY_VIBRATION = "vibration_enabled"
         const val KEY_RINGTONE_URI = "ringtone_uri"
         const val KEY_RINGTONE_TITLE = "ringtone_title"
+        const val KEY_THEME_MODE = "theme_mode"
         const val KEY_SCHEDULED_END_AT = "scheduled_end_at"
         const val KEY_SCHEDULED_LABEL = "scheduled_label"
         const val KEY_ACTIVE_START = "active_session_start"

@@ -37,6 +37,8 @@ private sealed interface Screen {
 
 @Composable
 fun AppRoot(
+    darkTheme: Boolean,
+    onToggleTheme: () -> Unit,
     incomingBackup: BackupPayload? = null,
     onIncomingBackupConsumed: () -> Unit = {}
 ) {
@@ -89,7 +91,9 @@ fun AppRoot(
             onOpenDrink = { screen = Screen.Drink },
             onOpenTrip = { screen = Screen.Trip },
             onOpenReview = { screen = Screen.Review },
-            onOpenBackup = { screen = Screen.Backup() }
+            onOpenBackup = { screen = Screen.Backup() },
+            darkTheme = darkTheme,
+            onToggleTheme = onToggleTheme
         )
         Screen.Timer -> TimerScreen(
             onBack = { screen = Screen.Home },

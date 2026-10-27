@@ -6,12 +6,19 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.xiancli_tools.data.BackupContainer
 import com.example.xiancli_tools.data.BackupPayload
+import com.example.xiancli_tools.data.SettingsRepository
+import com.example.xiancli_tools.data.ThemeMode
 import com.example.xiancli_tools.timer.NotificationHelper
 import com.example.xiancli_tools.ui.AppRoot
 import com.example.xiancli_tools.ui.theme.XianclitoolsTheme
@@ -29,8 +36,31 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         NotificationHelper.ensureChannels(this)
         setContent {
-            XianclitoolsTheme {
+            val settings = remember { SettingsRepository(this) }
+            var themeMode by remember { mutableStateOf(settings.themeMode) }
+            // 没手动切过就跟随系统；切过一次后以用户的选择为准。
+            val darkTheme = when (themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+            // 状态栏 / 导航栏的图标是系统画的，不跟 Compose 主题走：
+            // enableEdgeToEdge 只在启动时按系统 uiMode 定过一次，手动切主题得自己翻。
+            val view = LocalView.current
+            SideEffect {
+                WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = !darkTheme
+                    isAppearanceLightNavigationBars = !darkTheme
+                }
+            }
+            XianclitoolsTheme(darkTheme = darkTheme) {
                 AppRoot(
+                    darkTheme = darkTheme,
+                    onToggleTheme = {
+                        val next = if (darkTheme) ThemeMode.LIGHT else ThemeMode.DARK
+                        themeMode = next
+                        settings.themeMode = next
+                    },
                     incomingBackup = incomingBackup,
                     onIncomingBackupConsumed = { incomingBackup = null }
                 )
