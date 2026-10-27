@@ -41,8 +41,14 @@ fun AppRoot(
     onIncomingBackupConsumed: () -> Unit = {}
 ) {
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
-    // 足迹页的标签序号：进地图页再返回时恢复原标签（明细里点轨迹回来还停在明细）。
+    // 各工具页的二级标签序号。页面离开组合后自身的 tab 状态就没了，所以统一存在这里：
+    // 回首页转一圈再进来，还停在原来的标签（足迹停在「明细」就还是「明细」），不重置回第一个。
+    // 用 rememberSaveable，转屏与进程重建后也不会丢。
+    var timerTabOrdinal by rememberSaveable { mutableStateOf(0) }
+    var noteTabOrdinal by rememberSaveable { mutableStateOf(0) }
+    var ledgerTabOrdinal by rememberSaveable { mutableStateOf(0) }
     var trackTabOrdinal by rememberSaveable { mutableStateOf(0) }
+    var drinkTabOrdinal by rememberSaveable { mutableStateOf(0) }
     val context = LocalContext.current
 
     LaunchedEffect(incomingBackup) {
@@ -79,11 +85,7 @@ fun AppRoot(
             onOpenTimer = { screen = Screen.Timer },
             onOpenNote = { screen = Screen.Note },
             onOpenLedger = { screen = Screen.Ledger },
-            onOpenTrack = {
-                // 从首页进足迹时回到默认「记录」标签；从地图页返回时保持原标签。
-                trackTabOrdinal = 0
-                screen = Screen.Track
-            },
+            onOpenTrack = { screen = Screen.Track },
             onOpenDrink = { screen = Screen.Drink },
             onOpenTrip = { screen = Screen.Trip },
             onOpenReview = { screen = Screen.Review },
@@ -91,13 +93,19 @@ fun AppRoot(
         )
         Screen.Timer -> TimerScreen(
             onBack = { screen = Screen.Home },
-            onOpenSettings = { screen = Screen.NotificationSettings }
+            onOpenSettings = { screen = Screen.NotificationSettings },
+            initialTabOrdinal = timerTabOrdinal,
+            onTabChanged = { timerTabOrdinal = it }
         )
         Screen.Note -> NoteScreen(
-            onBack = { screen = Screen.Home }
+            onBack = { screen = Screen.Home },
+            initialTabOrdinal = noteTabOrdinal,
+            onTabChanged = { noteTabOrdinal = it }
         )
         Screen.Ledger -> LedgerScreen(
-            onBack = { screen = Screen.Home }
+            onBack = { screen = Screen.Home },
+            initialTabOrdinal = ledgerTabOrdinal,
+            onTabChanged = { ledgerTabOrdinal = it }
         )
         Screen.Track -> TrackScreen(
             onBack = { screen = Screen.Home },
@@ -110,7 +118,9 @@ fun AppRoot(
             onBack = { screen = Screen.Track }
         )
         Screen.Drink -> DrinkScreen(
-            onBack = { screen = Screen.Home }
+            onBack = { screen = Screen.Home },
+            initialTabOrdinal = drinkTabOrdinal,
+            onTabChanged = { drinkTabOrdinal = it }
         )
         Screen.Trip -> TripScreen(
             onBack = { screen = Screen.Home }

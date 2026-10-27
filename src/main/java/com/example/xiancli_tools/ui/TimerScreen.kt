@@ -118,14 +118,24 @@ private enum class TimerTab(val label: String) {
 @Composable
 fun TimerScreen(
     onBack: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    /** 标签由外层记住：回首页转一圈再进来，还停在原来那一块。 */
+    initialTabOrdinal: Int = TimerTab.QUICK.ordinal,
+    onTabChanged: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
     val repository = remember { SettingsRepository(context) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    var tab by remember { mutableStateOf(TimerTab.QUICK) }
+    var tab by remember {
+        mutableStateOf(TimerTab.entries.getOrElse(initialTabOrdinal) { TimerTab.QUICK })
+    }
+    // 切标签统一走这里，顺手把序号报给外层，避免内外两份状态对不上。
+    val selectTab: (TimerTab) -> Unit = {
+        tab = it
+        onTabChanged(it.ordinal)
+    }
     var endAt by remember { mutableLongStateOf(repository.scheduledEndAt) }
     var activeLabel by remember { mutableStateOf(repository.scheduledLabel) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -244,7 +254,7 @@ fun TimerScreen(
             SegmentedTabs(
                 labels = TimerTab.entries.map { it.label },
                 selectedIndex = tab.ordinal,
-                onSelect = { tab = TimerTab.entries[it] },
+                onSelect = { selectTab(TimerTab.entries[it]) },
                 accent = TimerAccent,
                 modifier = Modifier
                     .padding(horizontal = 16.dp)

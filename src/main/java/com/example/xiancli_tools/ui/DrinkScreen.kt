@@ -135,13 +135,25 @@ private val cellShape = RoundedCornerShape(20.dp)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DrinkScreen(onBack: () -> Unit) {
+fun DrinkScreen(
+    onBack: () -> Unit,
+    /** 标签由外层记住：回首页转一圈再进来，还停在原来那一块。 */
+    initialTabOrdinal: Int = DrinkTab.RECORD.ordinal,
+    onTabChanged: (Int) -> Unit = {}
+) {
     val context = LocalContext.current
     val repository = remember { DrinkRepository(context) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    var tab by remember { mutableStateOf(DrinkTab.RECORD) }
+    var tab by remember {
+        mutableStateOf(DrinkTab.entries.getOrElse(initialTabOrdinal) { DrinkTab.RECORD })
+    }
+    // 切标签统一走这里，顺手把序号报给外层，避免内外两份状态对不上。
+    val selectTab: (DrinkTab) -> Unit = {
+        tab = it
+        onTabChanged(it.ordinal)
+    }
     var categories by remember { mutableStateOf<List<DrinkCategory>>(emptyList()) }
     var records by remember { mutableStateOf<List<DrinkRecord>>(emptyList()) }
     // 明细与统计共用同一份周期：默认当月，进门就能看到整月喝了什么。
@@ -295,7 +307,7 @@ fun DrinkScreen(onBack: () -> Unit) {
             SegmentedTabs(
                 labels = DrinkTab.entries.map { it.label },
                 selectedIndex = tab.ordinal,
-                onSelect = { tab = DrinkTab.entries[it] },
+                onSelect = { selectTab(DrinkTab.entries[it]) },
                 accent = DrinkAccent,
                 modifier = Modifier
                     .padding(horizontal = 16.dp)

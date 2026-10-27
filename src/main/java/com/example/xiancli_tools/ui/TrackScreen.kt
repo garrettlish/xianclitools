@@ -104,7 +104,7 @@ fun TrackScreen(
     onBack: () -> Unit,
     /** 只传 id：地图页自己去仓库取点阵，这里不该把坐标读进内存。 */
     onOpenMap: (List<Long>) -> Unit,
-    /** 足迹页会被地图页进出打断，tab 由外层记住，返回时恢复原标签。 */
+    /** 标签由外层记住：进出地图页、回首页转一圈再进来，都还停在原来那一块。 */
     initialTabOrdinal: Int = TrackTab.RECORD.ordinal,
     onTabChanged: (Int) -> Unit = {}
 ) {
@@ -116,6 +116,11 @@ fun TrackScreen(
     val snapshot by TrackRecorderState.state.collectAsState()
     var tab by remember {
         mutableStateOf(TrackTab.entries.getOrElse(initialTabOrdinal) { TrackTab.RECORD })
+    }
+    // 切标签统一走这里，顺手把序号报给外层，避免内外两份状态对不上。
+    val selectTab: (TrackTab) -> Unit = {
+        tab = it
+        onTabChanged(it.ordinal)
     }
     var sessions by remember { mutableStateOf<List<TrackBrief>>(emptyList()) }
     var selectedMode by remember { mutableStateOf(TransportMode.WALK) }
@@ -229,10 +234,7 @@ fun TrackScreen(
             SegmentedTabs(
                 labels = TrackTab.entries.map { it.label },
                 selectedIndex = tab.ordinal,
-                onSelect = {
-                    tab = TrackTab.entries[it]
-                    onTabChanged(it)
-                },
+                onSelect = { selectTab(TrackTab.entries[it]) },
                 accent = TrackAccent,
                 modifier = Modifier
                     .padding(horizontal = 16.dp)

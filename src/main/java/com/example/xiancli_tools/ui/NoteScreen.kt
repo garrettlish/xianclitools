@@ -101,13 +101,25 @@ private enum class NoteTab(val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NoteScreen(onBack: () -> Unit) {
+fun NoteScreen(
+    onBack: () -> Unit,
+    /** 标签由外层记住：回首页转一圈再进来，还停在原来那一块。 */
+    initialTabOrdinal: Int = NoteTab.QUICK.ordinal,
+    onTabChanged: (Int) -> Unit = {}
+) {
     val context = LocalContext.current
     val repository = remember { NoteRepository(context) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    var tab by remember { mutableStateOf(NoteTab.QUICK) }
+    var tab by remember {
+        mutableStateOf(NoteTab.entries.getOrElse(initialTabOrdinal) { NoteTab.QUICK })
+    }
+    // 切标签统一走这里，顺手把序号报给外层，避免内外两份状态对不上。
+    val selectTab: (NoteTab) -> Unit = {
+        tab = it
+        onTabChanged(it.ordinal)
+    }
     var notes by remember { mutableStateOf<List<Note>>(emptyList()) }
     // 统计默认落在当月（而不是今天），进门就能看到整月的记录。
     var period by remember { mutableStateOf(NotePeriod.MONTH) }
@@ -159,7 +171,7 @@ fun NoteScreen(onBack: () -> Unit) {
         remindAt = note.remindAt
         done = note.done
         moodLevel = note.moodLevel
-        tab = NoteTab.QUICK
+        selectTab(NoteTab.QUICK)
     }
 
     /** 一条记录保存/勾选后，把它的闹钟和本地状态对齐。 */
@@ -299,7 +311,7 @@ fun NoteScreen(onBack: () -> Unit) {
     // 编辑态下返回先退出编辑回到明细，而不是直接回首页。
     fun exitEditToDetail() {
         resetEditor()
-        tab = NoteTab.DETAIL
+        selectTab(NoteTab.DETAIL)
     }
 
     BackHandler(enabled = editingId != null) { exitEditToDetail() }
@@ -333,7 +345,7 @@ fun NoteScreen(onBack: () -> Unit) {
             SegmentedTabs(
                 labels = NoteTab.entries.map { it.label },
                 selectedIndex = tab.ordinal,
-                onSelect = { tab = NoteTab.entries[it] },
+                onSelect = { selectTab(NoteTab.entries[it]) },
                 accent = NoteAccent,
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
