@@ -34,6 +34,9 @@ val StatsAccent = Color(0xFF2F86D6)
  */
 val DrinkAccent = StatsAccent
 
+/** 米家：品牌橙压暗一档。比计时那支琥珀更红，两个橙色放在首页才分得开。 */
+val MijiaAccent = Color(0xFFD06A32)
+
 /** 陶土红：删除、警示等需要压过强调色的场合。 */
 val ClayRed = Color(0xFFC05A45)
 

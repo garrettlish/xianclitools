@@ -1,10 +1,5 @@
 package com.example.xiancli_tools.ui
 
-import android.content.pm.PackageManager
-import android.os.Build
-import android.text.format.Formatter
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,8 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -37,7 +30,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,11 +43,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import com.example.xiancli_tools.R
 import com.example.xiancli_tools.data.BackupRepository
 import com.example.xiancli_tools.data.lan.LanDiscovery
-import com.example.xiancli_tools.data.lan.NearbySyncController
 import com.example.xiancli_tools.ui.components.SectionCard
 import com.example.xiancli_tools.ui.theme.TrackAccent
 import kotlinx.coroutines.launch
@@ -73,74 +63,15 @@ fun NearbySyncScreen(onBack: () -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    var peers by remember { mutableStateOf(emptyList<LanDiscovery.Peer>()) }
-    var localAddress by remember { mutableStateOf<String?>(null) }
-    var status by remember { mutableStateOf("正在准备…") }
-    var incomingFrom by remember { mutableStateOf<String?>(null) }
-    var incomingSize by remember { mutableStateOf(0) }
     var manualAddress by remember { mutableStateOf("") }
     var manualError by remember { mutableStateOf(false) }
 
-    fun notify(message: String) {
+    val session = rememberNearbySyncSession(repository) { message ->
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
 
-    val controller = remember {
-        NearbySyncController(
-            context = context,
-            repository = repository,
-            callbacks = object : NearbySyncController.Callbacks {
-                override fun onReady(address: String) {
-                    localAddress = address
-                }
-
-                override fun onPeersChanged(list: List<LanDiscovery.Peer>) {
-                    peers = list
-                }
-
-                override fun onIncomingRequest(from: String, payloadBytes: Int) {
-                    incomingFrom = from
-                    incomingSize = payloadBytes
-                }
-
-                override fun onStatus(message: String) {
-                    status = message
-                }
-
-                override fun onResult(message: String) {
-                    notify(message)
-                }
-            }
-        )
-    }
-
-    // Android 16 起访问本地网络要用户授权；低版本没有这个权限，直接开始。
-    var permitted by remember { mutableStateOf(Build.VERSION.SDK_INT < 36) }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        // 无论给没给都继续：没给的话连接会失败，界面上会看到具体报错，比卡在这里好。
-        permitted = true
-    }
-
-    LaunchedEffect(Unit) {
-        if (!permitted) {
-            val granted = ContextCompat.checkSelfPermission(
-                context, LOCAL_NETWORK_PERMISSION
-            ) == PackageManager.PERMISSION_GRANTED
-            if (granted) permitted = true else permissionLauncher.launch(
-                arrayOf(LOCAL_NETWORK_PERMISSION)
-            )
-        }
-    }
-
-    LaunchedEffect(permitted) {
-        if (permitted) controller.start()
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { controller.stop() }
-    }
+    // 这是直传的主页面，进来就起服务并开始搜索。
+    LaunchedEffect(Unit) { session.start() }
 
     Scaffold(
         topBar = {
@@ -180,8 +111,8 @@ fun NearbySyncScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(16.dp))
 
             SectionCard(title = "本机") {
-                InfoRow("设备名", controller.deviceName)
-                InfoRow("地址", localAddress ?: "获取中…")
+                InfoRow("设备名", session.deviceName)
+                InfoRow("地址", session.address ?: "获取中…")
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(
@@ -191,7 +122,7 @@ fun NearbySyncScreen(onBack: () -> Unit) {
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = status,
+                        text = session.status,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -201,20 +132,20 @@ fun NearbySyncScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(16.dp))
 
             SectionCard(title = "附近设备") {
-                if (peers.isEmpty()) {
+                if (session.peers.isEmpty()) {
                     Text(
                         text = "正在搜索同一 Wi-Fi 下的设备…\n对方的手机上也要打开这个页面。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    peers.forEach { peer ->
-                        PeerRow(peer) { controller.sendTo(peer) }
+                    session.peers.forEach { peer ->
+                        PeerRow(peer) { session.sendTo(peer) }
                         Spacer(Modifier.height(8.dp))
                     }
                 }
                 Spacer(Modifier.height(4.dp))
-                TextButton(onClick = { controller.refresh() }) { Text("重新搜索") }
+                TextButton(onClick = { session.refresh() }) { Text("重新搜索") }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -247,7 +178,7 @@ fun NearbySyncScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = {
-                        if (!controller.sendToAddress(manualAddress)) manualError = true
+                        if (!session.sendToAddress(manualAddress)) manualError = true
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -265,39 +196,7 @@ fun NearbySyncScreen(onBack: () -> Unit) {
         }
     }
 
-    incomingFrom?.let { from ->
-        AlertDialog(
-            onDismissRequest = {
-                incomingFrom = null
-                controller.answerIncoming(false)
-            },
-            title = { Text("有设备请求同步", fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    text = "「$from」想与这台设备交换数据" +
-                        "（约 ${Formatter.formatFileSize(context, incomingSize.toLong())}）。\n" +
-                        "确认是你自己的另一台设备后再接受。",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        incomingFrom = null
-                        controller.answerIncoming(true)
-                    }
-                ) { Text("接受") }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        incomingFrom = null
-                        controller.answerIncoming(false)
-                    }
-                ) { Text("拒绝") }
-            }
-        )
-    }
+    IncomingSyncRequestDialog(session)
 }
 
 @Composable
@@ -361,6 +260,3 @@ private fun PeerRow(peer: LanDiscovery.Peer, onClick: () -> Unit) {
         }
     }
 }
-
-/** Android 16（API 36）起的本地网络权限；用字符串是为了不依赖编译期常量是否存在。 */
-private const val LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK"

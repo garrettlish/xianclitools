@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * 记事 / 记账 / 轨迹 / 专注 / 饮记 / 出行的统一 JSON 编解码。
+ * 记事 / 记账 / 轨迹 / 专注 / 饮记的统一 JSON 编解码。
  *
  * 本地存储文件与导出的备份文件共用同一套字段，避免两处格式各自演化：
  * 字段只在这里改一次，本地读写与导入导出同时生效。
@@ -264,37 +264,4 @@ object JsonCodec {
 
     private val COLOR_PATTERN = Regex("^#[0-9A-Fa-f]{6}$")
     private const val FALLBACK_COLOR = "#9C948A"
-
-    // ---- 出行 ----
-
-    fun tripToJson(trip: Trip): JSONObject = JSONObject()
-        .put("id", trip.id)
-        .put("name", trip.name)
-        .put("start", trip.startMillis)
-        .put("end", trip.endMillis)
-        .put("note", trip.note)
-        .put("updatedAt", trip.updatedAt)
-        .put("deletedAt", trip.deletedAt ?: 0L)
-
-    fun tripFromJson(json: JSONObject): Trip = Trip(
-        id = json.optLong("id"),
-        name = json.optString("name"),
-        startMillis = json.optLong("start"),
-        endMillis = json.optLong("end"),
-        note = json.optString("note"),
-        updatedAt = json.optLong("updatedAt", 0L).takeIf { it > 0L } ?: json.optLong("end"),
-        deletedAt = json.optLong("deletedAt", 0L).takeIf { it > 0L }
-    )
-
-    fun tripsToJson(trips: List<Trip>): JSONArray {
-        val array = JSONArray()
-        trips.forEach { array.put(tripToJson(it)) }
-        return array
-    }
-
-    fun tripsFromJson(array: JSONArray): List<Trip> = buildList {
-        for (index in 0 until array.length()) {
-            array.optJSONObject(index)?.let { add(tripFromJson(it)) }
-        }
-    }
 }

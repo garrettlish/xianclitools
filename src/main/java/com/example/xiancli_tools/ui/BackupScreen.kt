@@ -54,7 +54,6 @@ import com.example.xiancli_tools.data.BackupRepository
 import com.example.xiancli_tools.data.describe
 import com.example.xiancli_tools.ui.theme.DrinkAccent
 import com.example.xiancli_tools.ui.theme.LedgerAccent
-import com.example.xiancli_tools.ui.theme.MutedRose
 import com.example.xiancli_tools.ui.theme.NoteAccent
 import com.example.xiancli_tools.ui.theme.TimerAccent
 import com.example.xiancli_tools.ui.theme.TrackAccent
@@ -241,7 +240,6 @@ fun BackupScreen(
                     CountRow("足迹", payload.visibleSessions, TrackAccent)
                     CountRow("专注", payload.visibleTimers, TimerAccent)
                     CountRow("饮记", payload.visibleDrinkRecords, DrinkAccent)
-                    CountRow("出行", payload.visibleTrips, MutedRose)
                 }
             }
 
@@ -325,7 +323,7 @@ fun BackupScreen(
 
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "「附近直传」要求两台设备连同一个 Wi-Fi：双方都打开该页面，点一下对方设备名即可，速度最快且不经过任何服务。" +
+                text = "「附近直传」要求两台设备连同一个 Wi-Fi：双方都打开该页面（或在首页点「直传」），点一下对方设备名即可，速度最快且不经过任何服务。" +
                     "「分享到其他设备」走系统分享面板（微信、蓝牙都行），对方点开文件后选「用其他应用打开 → 朝夕」也能导入；" +
                     "老版本导出的 .json 备份同样能导入。",
                 style = MaterialTheme.typography.bodySmall,

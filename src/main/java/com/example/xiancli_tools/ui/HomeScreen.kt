@@ -20,9 +20,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,7 +36,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,9 +47,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.xiancli_tools.R
+import com.example.xiancli_tools.data.BackupRepository
 import com.example.xiancli_tools.data.DateRanges
 import com.example.xiancli_tools.data.DrinkRepository
 import com.example.xiancli_tools.data.LedgerRepository
@@ -51,16 +60,18 @@ import com.example.xiancli_tools.data.NoteRepository
 import com.example.xiancli_tools.data.ReviewAnalytics
 import com.example.xiancli_tools.data.TimerSessionRepository
 import com.example.xiancli_tools.data.TrackRepository
+import com.example.xiancli_tools.data.lan.LanDiscovery
 import com.example.xiancli_tools.ui.components.IconBadge
 import com.example.xiancli_tools.ui.theme.BrandDawn
 import com.example.xiancli_tools.ui.theme.BrandDusk
 import com.example.xiancli_tools.ui.theme.DrinkAccent
 import com.example.xiancli_tools.ui.theme.LedgerAccent
-import com.example.xiancli_tools.ui.theme.MutedRose
+import com.example.xiancli_tools.ui.theme.MijiaAccent
 import com.example.xiancli_tools.ui.theme.NoteAccent
 import com.example.xiancli_tools.ui.theme.TimerAccent
 import com.example.xiancli_tools.ui.theme.TrackAccent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.roundToLong
@@ -75,21 +86,53 @@ fun HomeScreen(
     onOpenLedger: () -> Unit,
     onOpenTrack: () -> Unit,
     onOpenDrink: () -> Unit,
-    onOpenTrip: () -> Unit,
+    onOpenMijia: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenBackup: () -> Unit,
+    onOpenNearby: () -> Unit,
     darkTheme: Boolean,
     onToggleTheme: () -> Unit
 ) {
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     var todayExpense by remember { mutableLongStateOf(0L) }
     var todayFocus by remember { mutableLongStateOf(0L) }
     var pendingTodos by remember { mutableIntStateOf(0) }
     var todayDistance by remember { mutableDoubleStateOf(0.0) }
     var todayDrinks by remember { mutableIntStateOf(0) }
+    // 直传会把两边数据合到一起，「今天」这几格得跟着重算。
+    var dataVersion by remember { mutableIntStateOf(0) }
+    var peersMenuOpen by remember { mutableStateOf(false) }
+
+    fun notify(message: String) {
+        scope.launch {
+            // 新消息顶掉还在显示的那条：从「正在同步」到结果不用干等几秒。
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    val nearby = rememberNearbySyncSession(remember { BackupRepository(context) }) { message ->
+        // 同步结束（成功或失败）都重读一次今天的数据：成功时数字变了，失败时重读也无害。
+        dataVersion++
+        notify(message)
+    }
+
+    // 首页不主动起服务，点开「直传」下拉才起：省掉一进 App 就占网络，也把本地网络授权留到用户真用的时候。
+    fun openPeersMenu() {
+        peersMenuOpen = true
+        nearby.start()
+    }
+
+    fun sendTo(peer: LanDiscovery.Peer) {
+        peersMenuOpen = false
+        notify("正在与「${peer.name}」同步…")
+        nearby.sendTo(peer)
+    }
 
     // 首页只取今天这几个数，进页面时读一次就够，不做常驻监听。
-    LaunchedEffect(Unit) {
+    LaunchedEffect(dataVersion) {
         withContext(Dispatchers.IO) {
             val range = DateRanges.day(System.currentTimeMillis())
             todayExpense = LedgerRepository(context).loadRecords()
@@ -108,7 +151,7 @@ fun HomeScreen(
         }
     }
 
-    Scaffold { padding ->
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -146,6 +189,49 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // 「直传」紧挨在「备份」左边：点开就是同 Wi-Fi 下已发现的设备名，
+                    // 点名字直接推过去，不用先进备份页再找附近的机器。
+                    Box {
+                        Surface(
+                            onClick = { openPeersMenu() },
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_nearby),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "直传",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_chevron_down),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                        NearbyPeersMenu(
+                            expanded = peersMenuOpen,
+                            session = nearby,
+                            onSend = { sendTo(it) },
+                            onOpenNearbyPage = {
+                                peersMenuOpen = false
+                                onOpenNearby()
+                            },
+                            onDismiss = { peersMenuOpen = false }
+                        )
+                    }
                     Surface(
                         onClick = onOpenBackup,
                         shape = CircleShape,
@@ -250,13 +336,85 @@ fun HomeScreen(
             )
             Spacer(Modifier.height(10.dp))
             ToolCard(
-                title = "出行",
-                subtitle = "一次行程的花费、里程与备忘",
-                icon = R.drawable.ic_tool_trip,
-                accent = MutedRose,
-                onClick = onOpenTrip
+                title = "米家",
+                subtitle = "开关灯、调亮度、一键全关",
+                icon = R.drawable.ic_tool_mijia,
+                accent = MijiaAccent,
+                onClick = onOpenMijia
             )
         }
+    }
+
+    // 对方从首页或直传页点到这台设备时，这里也得弹确认，不能只在直传页里接。
+    IncomingSyncRequestDialog(nearby)
+}
+
+/**
+ * 首页「直传」下拉：列出同一 Wi-Fi 下已发现的设备，点名字直接推过去。
+ *
+ * 列表只会有「正在搜索」这一种空态，所以状态文案直接复用会话里的 [NearbySyncSession.status]，
+ * 不用再编一套「搜索中 / 已就绪 / 失败」的措辞。
+ */
+@Composable
+private fun NearbyPeersMenu(
+    expanded: Boolean,
+    session: NearbySyncSession,
+    onSend: (LanDiscovery.Peer) -> Unit,
+    onOpenNearbyPage: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        if (session.peers.isEmpty()) {
+            DropdownMenuItem(
+                text = {
+                    Column {
+                        Text(
+                            text = session.status,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "另一台设备也要点一下「直传」。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                onClick = {},
+                enabled = false
+            )
+        } else {
+            session.peers.forEach { peer ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(
+                                text = peer.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "${peer.host}:${peer.port}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    onClick = { onSend(peer) }
+                )
+            }
+        }
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text("重新搜索") },
+            onClick = { session.refresh() }
+        )
+        DropdownMenuItem(
+            text = { Text("打开附近直传页…") },
+            onClick = onOpenNearbyPage
+        )
     }
 }
 

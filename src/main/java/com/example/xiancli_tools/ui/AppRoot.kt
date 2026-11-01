@@ -26,12 +26,14 @@ private sealed interface Screen {
     /** 只带 id：点阵由地图页自己去仓库取，别在导航状态里揣着几十万个坐标。 */
     data class TrackMap(val sessionIds: List<Long>) : Screen
     data object Drink : Screen
-    data object Trip : Screen
+    data object Mijia : Screen
     data object Review : Screen
 
     /** [incoming] 是从系统「用其他应用打开」带进来的备份，非空时进页就弹合并确认。 */
     data class Backup(val incoming: BackupPayload? = null) : Screen
-    data object NearbySync : Screen
+
+    /** [fromHome] 表示从首页「直传」下拉进来的，返回时回首页而不是备份页。 */
+    data class NearbySync(val fromHome: Boolean = false) : Screen
     data object NotificationSettings : Screen
 }
 
@@ -51,6 +53,7 @@ fun AppRoot(
     var ledgerTabOrdinal by rememberSaveable { mutableStateOf(0) }
     var trackTabOrdinal by rememberSaveable { mutableStateOf(0) }
     var drinkTabOrdinal by rememberSaveable { mutableStateOf(0) }
+    var mijiaTabOrdinal by rememberSaveable { mutableStateOf(0) }
     val context = LocalContext.current
 
     LaunchedEffect(incomingBackup) {
@@ -73,11 +76,11 @@ fun AppRoot(
     }
 
     BackHandler(enabled = screen != Screen.Home) {
-        screen = when (screen) {
+        screen = when (val current = screen) {
             Screen.NotificationSettings -> Screen.Timer
             is Screen.TrackMap -> Screen.Track
-            // 直传是从备份页进来的，返回时回到备份页，数据可能已经被同步过，正好重取一次。
-            Screen.NearbySync -> Screen.Backup()
+            // 直传是从备份页或首页进来的，返回时回到进来的地方，数据可能已经被同步过，正好重取一次。
+            is Screen.NearbySync -> if (current.fromHome) Screen.Home else Screen.Backup()
             else -> Screen.Home
         }
     }
@@ -89,9 +92,10 @@ fun AppRoot(
             onOpenLedger = { screen = Screen.Ledger },
             onOpenTrack = { screen = Screen.Track },
             onOpenDrink = { screen = Screen.Drink },
-            onOpenTrip = { screen = Screen.Trip },
+            onOpenMijia = { screen = Screen.Mijia },
             onOpenReview = { screen = Screen.Review },
             onOpenBackup = { screen = Screen.Backup() },
+            onOpenNearby = { screen = Screen.NearbySync(fromHome = true) },
             darkTheme = darkTheme,
             onToggleTheme = onToggleTheme
         )
@@ -126,8 +130,10 @@ fun AppRoot(
             initialTabOrdinal = drinkTabOrdinal,
             onTabChanged = { drinkTabOrdinal = it }
         )
-        Screen.Trip -> TripScreen(
-            onBack = { screen = Screen.Home }
+        Screen.Mijia -> MijiaScreen(
+            onBack = { screen = Screen.Home },
+            initialTabOrdinal = mijiaTabOrdinal,
+            onTabChanged = { mijiaTabOrdinal = it }
         )
         Screen.Review -> ReviewScreen(
             onBack = { screen = Screen.Home },
@@ -136,12 +142,12 @@ fun AppRoot(
         )
         is Screen.Backup -> BackupScreen(
             onBack = { screen = Screen.Home },
-            onOpenNearby = { screen = Screen.NearbySync },
+            onOpenNearby = { screen = Screen.NearbySync() },
             incoming = current.incoming,
             onIncomingConsumed = onIncomingBackupConsumed
         )
-        Screen.NearbySync -> NearbySyncScreen(
-            onBack = { screen = Screen.Backup() }
+        is Screen.NearbySync -> NearbySyncScreen(
+            onBack = { screen = if (current.fromHome) Screen.Home else Screen.Backup() }
         )
         Screen.NotificationSettings -> NotificationSettingsScreen(
             onBack = { screen = Screen.Timer }

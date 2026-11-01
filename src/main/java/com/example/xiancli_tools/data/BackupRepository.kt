@@ -10,7 +10,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 备份的落盘与恢复：把记事、记账、轨迹、专注记录、饮记、出行打包成单个文件，
+ * 备份的落盘与恢复：把记事、记账、轨迹、专注记录、饮记打包成单个文件，
  * 或者从这样一个文件里把数据写回本地。
  *
  * 文件读写走 SAF（系统文件选择器）给出的 Uri，因此不需要任何存储权限。
@@ -24,7 +24,6 @@ class BackupRepository(context: Context) {
     private val trackRepository = TrackRepository(appContext)
     private val timerRepository = TimerSessionRepository(appContext)
     private val drinkRepository = DrinkRepository(appContext)
-    private val tripRepository = TripRepository(appContext)
 
     /**
      * 备份取的是**含墓碑**的全量数据。
@@ -36,8 +35,7 @@ class BackupRepository(context: Context) {
         sessions = trackRepository.loadAllSessions(),
         timers = timerRepository.loadAllSessions(),
         drinkCategories = drinkRepository.loadAllCategories(),
-        drinkRecords = drinkRepository.loadAllRecords(),
-        trips = tripRepository.loadAllTrips()
+        drinkRecords = drinkRepository.loadAllRecords()
     )
 
     /** 把当前全部数据写入指定 Uri，返回写出的内容。 */
@@ -86,6 +84,5 @@ class BackupRepository(context: Context) {
         timerRepository.replaceAll(target.timers)
         drinkRepository.replaceAllCategories(target.drinkCategories)
         drinkRepository.replaceAllRecords(target.drinkRecords)
-        tripRepository.replaceAll(target.trips)
     }
 }

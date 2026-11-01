@@ -16,13 +16,12 @@ data class BackupPayload(
     val sessions: List<TrackSession> = emptyList(),
     val timers: List<TimerSession> = emptyList(),
     val drinkCategories: List<DrinkCategory> = emptyList(),
-    val drinkRecords: List<DrinkRecord> = emptyList(),
-    val trips: List<Trip> = emptyList()
+    val drinkRecords: List<DrinkRecord> = emptyList()
 ) {
     /** 含墓碑的总条数：备份文件里实际存了多少条。 */
     val totalCount: Int
         get() = notes.size + records.size + sessions.size + timers.size +
-            drinkCategories.size + drinkRecords.size + trips.size
+            drinkCategories.size + drinkRecords.size
 
     // 墓碑是同步用的内部状态，界面上不该出现，所以展示一律走 visible* 这组。
 
@@ -38,13 +37,11 @@ data class BackupPayload(
         get() = drinkCategories.count { it.deletedAt == null }
     val visibleDrinkRecords: Int
         get() = drinkRecords.count { it.deletedAt == null }
-    val visibleTrips: Int
-        get() = trips.count { it.deletedAt == null }
 
     /** 用户看得见的条数。 */
     val visibleCount: Int
         get() = visibleNotes + visibleRecords + visibleSessions + visibleTimers +
-            visibleDrinkCategories + visibleDrinkRecords + visibleTrips
+            visibleDrinkCategories + visibleDrinkRecords
 
     /**
      * 与现有数据合并：同 id 的记录比较 [updatedAt]，谁的更新用谁的。
@@ -77,8 +74,7 @@ data class BackupPayload(
         drinkRecords = mergeLww(
             existing.drinkRecords, drinkRecords, DrinkRecord::id,
             DrinkRecord::updatedAt, DrinkRecord::deletedAt
-        ),
-        trips = mergeLww(existing.trips, trips, Trip::id, Trip::updatedAt, Trip::deletedAt)
+        )
     )
 
     /** 相对现有数据会新增 / 更新 / 删除的条数，用于导入前后的提示。 */
@@ -104,11 +100,10 @@ data class BackupPayload(
             existing.drinkRecords, drinkRecords, DrinkRecord::id,
             DrinkRecord::updatedAt, DrinkRecord::deletedAt
         )
-        val g = diffLww(existing.trips, trips, Trip::id, Trip::updatedAt, Trip::deletedAt)
         return MergeDiff(
-            added = a.added + b.added + c.added + d.added + e.added + f.added + g.added,
-            updated = a.updated + b.updated + c.updated + d.updated + e.updated + f.updated + g.updated,
-            removed = a.removed + b.removed + c.removed + d.removed + e.removed + f.removed + g.removed
+            added = a.added + b.added + c.added + d.added + e.added + f.added,
+            updated = a.updated + b.updated + c.updated + d.updated + e.updated + f.updated,
+            removed = a.removed + b.removed + c.removed + d.removed + e.removed + f.removed
         )
     }
 }
@@ -192,6 +187,10 @@ class BackupFormatException(message: String) : Exception(message)
  *      改为 `drinkCategories` / `drinkRecords`。读 1–3 时习惯数据会被静默忽略，
  *      其余类型照常导入；schema 4 的文件不能被旧版 App 读取。
  *
+ * 「出行」下线后 `trips` 也不再写出、不再读取（读到时按认不出的键整段跳过）。
+ * **版本号停在 4 不变**：网页版仍按 schema 4 读写，双方互传备份时要能对上；
+ * 少一个数组对合并是安全的——对方拿不到这一项就保留自己那份。
+ *
  * 从哪一版起读写是流式的（**格式没变**，只是不再一次性把整份备份读进内存）：
  * - 写：一条一条序列化后直接写进 `Writer`，不再先拼出一个几十 MB 的 String；
  * - 读：用 [JsonStream] 按元素切分，同一时刻只有一条记录在内存里。
@@ -246,8 +245,6 @@ object BackupCodec {
         out.write(payload.drinkCategories.size.toString())
         out.write(",\"drinkRecords\":")
         out.write(payload.drinkRecords.size.toString())
-        out.write(",\"trips\":")
-        out.write(payload.trips.size.toString())
         out.write("}")
         writeArray(out, "notes", payload.notes) { JsonCodec.noteToJson(it) }
         writeArray(out, "ledger", payload.records) { JsonCodec.recordToJson(it) }
@@ -257,7 +254,6 @@ object BackupCodec {
             JsonCodec.drinkCategoryToJson(it)
         }
         writeArray(out, "drinkRecords", payload.drinkRecords) { JsonCodec.drinkRecordToJson(it) }
-        writeArray(out, "trips", payload.trips) { JsonCodec.tripToJson(it) }
         out.write("}")
     }
 
@@ -298,7 +294,6 @@ object BackupCodec {
         var timers = emptyList<TimerSession>()
         var drinkCategories = emptyList<DrinkCategory>()
         var drinkRecords = emptyList<DrinkRecord>()
-        var trips = emptyList<Trip>()
         try {
             while (true) {
                 when (val key = stream.nextMember() ?: break) {
@@ -313,7 +308,6 @@ object BackupCodec {
                     "drinkRecords" -> drinkRecords =
                         stream.readElements { JsonCodec.drinkRecordFromJson(it) }
 
-                    "trips" -> trips = stream.readElements { JsonCodec.tripFromJson(it) }
                     // app / exportedAt / counts 只是给人看的，认一下或者直接跳。
                     "app" -> stream.readString()
                     "exportedAt" -> stream.readLong()
@@ -336,8 +330,7 @@ object BackupCodec {
             sessions = sessions,
             timers = timers,
             drinkCategories = drinkCategories,
-            drinkRecords = drinkRecords,
-            trips = trips
+            drinkRecords = drinkRecords
         )
     }
 

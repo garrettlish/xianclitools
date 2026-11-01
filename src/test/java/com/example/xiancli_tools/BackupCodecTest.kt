@@ -18,7 +18,6 @@ import com.example.xiancli_tools.data.TimerSession
 import com.example.xiancli_tools.data.TrackPoint
 import com.example.xiancli_tools.data.TrackSession
 import com.example.xiancli_tools.data.TransportMode
-import com.example.xiancli_tools.data.Trip
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -89,15 +88,6 @@ class BackupCodecTest {
                 id = 5100L,
                 categoryId = 5000L,
                 timeMillis = 1_700_000_300_000L
-            )
-        ),
-        trips = listOf(
-            Trip(
-                id = 6000L,
-                name = "西安三天",
-                startMillis = 1_700_000_000_000L,
-                endMillis = 1_700_200_000_000L,
-                note = "回民街"
             )
         )
     )
@@ -326,7 +316,6 @@ class BackupCodecTest {
         assertTrue(payload.timers.isEmpty())
         assertTrue(payload.drinkCategories.isEmpty())
         assertTrue(payload.drinkRecords.isEmpty())
-        assertTrue(payload.trips.isEmpty())
     }
 
     @Test

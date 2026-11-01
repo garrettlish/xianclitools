@@ -1,0 +1,17 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 电视 / 投影：屏幕 + 底座。 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M4.4,4.8h15.2a1.6,1.6 0 0 1 1.6,1.6v9.2a1.6,1.6 0 0 1 -1.6,1.6H4.4a1.6,1.6 0 0 1 -1.6,-1.6V6.4a1.6,1.6 0 0 1 1.6,-1.6z"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.7" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M8.4,20.4h7.2"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.7" />
+</vector>

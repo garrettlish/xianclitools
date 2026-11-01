@@ -52,7 +52,7 @@ data class TrackSession(
 }
 
 /**
- * 不含点阵的轨迹骨架：列表、明细、统计、回顾、出行只用得到这些字段。
+ * 不含点阵的轨迹骨架：列表、明细、统计、回顾只用得到这些字段。
  *
  * 单独一个类型而不是「points 为空的 TrackSession」，是为了让「拿着摘要去画地图」
  * 这种错误在编译期就不可能——地图那条路走的是 `TrackRepository.loadSessions(ids)`。

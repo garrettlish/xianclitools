@@ -13,7 +13,7 @@ class TrackRepository(context: Context) {
     private val activeFile = File(appContext.filesDir, ACTIVE_FILE)
 
     /**
-     * 列表 / 明细 / 统计 / 回顾 / 出行都用这一份。
+     * 列表 / 明细 / 统计 / 回顾都用这一份。
      *
      * 只读骨架、不读点阵：解析时整段跳过 `points`，所以几万条轨迹也只有几百 KB 内存、
      * 秒开。要画地图请走 [loadSessions]，那是唯一真正需要坐标的路径。

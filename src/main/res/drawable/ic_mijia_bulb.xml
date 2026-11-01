@@ -1,0 +1,17 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 灯：灯泡 + 灯座。 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,2.8a5.6,5.6 0 0 0 -3.4,10.1v1.9h6.8v-1.9A5.6,5.6 0 0 0 12,2.8z"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.7" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M9.6,17.9h4.8M10.6,20.6h2.8"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.7" />
+</vector>
