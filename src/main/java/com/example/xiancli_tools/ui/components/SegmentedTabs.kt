@@ -1,5 +1,7 @@
 package com.example.xiancli_tools.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +24,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.xiancli_tools.R
+import com.example.xiancli_tools.ui.theme.Dimens
 
 /**
  * 工具页三个模式标签的统一图标：记录 / 明细 / 统计。
@@ -54,7 +58,7 @@ fun SegmentedTabs(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(Dimens.CornerM))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -63,20 +67,29 @@ fun SegmentedTabs(
             val active = index == selectedIndex
             // 带 accent 的是「模式切换」，用淡强调色底把它和下面的周期筛选区分开；
             // 不带的（日/周/月/年）用白底，视觉上退到第二层。
-            val background = when {
-                !active -> Color.Transparent
-                accent != null -> accent.copy(alpha = 0.16f)
-                else -> MaterialTheme.colorScheme.surface
-            }
-            val contentColor = when {
-                !active -> MaterialTheme.colorScheme.onSurfaceVariant
-                accent != null -> accent
-                else -> MaterialTheme.colorScheme.onSurface
-            }
+            // 选中态用颜色过渡动画：切换时底与字一起淡入淡出，不生硬跳变。
+            val background by animateColorAsState(
+                targetValue = when {
+                    !active -> Color.Transparent
+                    accent != null -> accent.copy(alpha = 0.16f)
+                    else -> MaterialTheme.colorScheme.surface
+                },
+                animationSpec = tween(durationMillis = 180),
+                label = "segment-bg-$index"
+            )
+            val contentColor by animateColorAsState(
+                targetValue = when {
+                    !active -> MaterialTheme.colorScheme.onSurfaceVariant
+                    accent != null -> accent
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+                animationSpec = tween(durationMillis = 180),
+                label = "segment-content-$index"
+            )
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(RoundedCornerShape(Dimens.CornerS))
                     .background(background)
                     .clickable { onSelect(index) }
                     .padding(vertical = 8.dp),

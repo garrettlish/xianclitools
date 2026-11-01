@@ -3,48 +3,45 @@ package com.example.xiancli_tools.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * 纸感暖色盘：底色不用纯白，改成带一点米黄的暖白，长时间看不刺眼；
- * 五类强调色统一压饱和、加暖调，避免 Material 默认色那种「系统设置页」的冷感。
+ * 艳丽高对比色板（Bento 风格）：底色是暖奶油纸，卡片纯白，强调色全部换成
+ * 高饱和的 600 级色（Tailwind 色阶），在白卡上做正文级数字仍有 3.5:1 以上的对比，
+ * 在暗色表面上也够亮。类别色卡（账本/备忘）直接引用这些常量，换这里 = 全局换血。
  */
-val Paper = Color(0xFFFAF7F2)
-val PaperDeep = Color(0xFFF3EDE3)
+val Paper = Color(0xFFFFF6EA)
+val PaperDeep = Color(0xFFF9EBD9)
 val CardWhite = Color(0xFFFFFFFF)
-val Ink = Color(0xFF1F1D1A)
-val InkSoft = Color(0xFF6F675C)
-val LineSoft = Color(0xFFE6E0D6)
+val Ink = Color(0xFF111827)
+val InkSoft = Color(0xFF4B5563)
+val LineSoft = Color(0xFFE8DCC6)
 
 /**
- * 品牌色：晨光与暮色。用于「朝夕」字标的渐变两端。
- * 比工具强调色深一档——22sp 粗体在暖白底上要够对比度（#C87A2E 约 3.1:1，#9E5570 约 4.9:1）。
- * 首页左侧那枚记号是启动图标的缩小版，色值跟着 `ic_launcher_foreground` 走，不取这两个值。
+ * 品牌色：晨光与暮色的艳丽渐变。左「朝」橙、右「夕」桃红，
+ * 22sp 粗体在奶油底上分别约 3.6:1 / 4.5:1，大字达标。
  */
-val BrandDawn = Color(0xFFC87A2E)
-val BrandDusk = Color(0xFF9E5570)
+val BrandDawn = Color(0xFFEA580C)
+val BrandDusk = Color(0xFFDB2777)
 
-/** 五个工具的强调色，同一套暖色家族：琥珀 / 藕紫 / 咖褐 / 苔绿 / 水蓝。 */
-val TimerAccent = Color(0xFFE8963A)
-val NoteAccent = Color(0xFF9B6DB5)
-val LedgerAccent = Color(0xFF8D6748)
-val TrackAccent = Color(0xFF5AA469)
-val StatsAccent = Color(0xFF2F86D6)
+/** 六个工具的强调色：亮橙 / 紫 / 金 / 绿 / 蓝 / 桃红，六个色相互不粘连。 */
+val TimerAccent = Color(0xFFEA580C)
+val NoteAccent = Color(0xFF7C3AED)
+val LedgerAccent = Color(0xFFCA8A04)
+val TrackAccent = Color(0xFF16A34A)
+val StatsAccent = Color(0xFF2563EB)
 
-/**
- * 饮记：水蓝。直接取统计色，不另调一个近似值——
- * 同一族里多调一档，界面上两个蓝谁也说不清哪个是哪个。
- */
+/** 饮记：直接取统计蓝，不另调近似值——同一族多调一档，两个蓝谁也说不清。 */
 val DrinkAccent = StatsAccent
 
-/** 米家：品牌橙压暗一档。比计时那支琥珀更红，两个橙色放在首页才分得开。 */
-val MijiaAccent = Color(0xFFD06A32)
+/** 米家：桃红。亮橙已被计时占住，桃红在首页远看也分得开。 */
+val MijiaAccent = Color(0xFFDB2777)
 
-/** 陶土红：删除、警示等需要压过强调色的场合。 */
-val ClayRed = Color(0xFFC05A45)
+/** 红：删除、警示。与桃红同族但更纯更正，只在危险场合出场。 */
+val ClayRed = Color(0xFFDC2626)
 
-/** 暖灰：无类别 / 未分类的中性色，比 #9E9E9E 更贴纸感底色。 */
-val WarmGray = Color(0xFF9C948A)
+/** 石板灰：无类别 / 未分类的中性色，艳丽色板里负责「收」的那一支。 */
+val WarmGray = Color(0xFF64748B)
 
-/** 暖灰青：医疗、其他等辅助类别。 */
-val MutedTeal = Color(0xFF4E9BA0)
+/** 青：医疗、其他等辅助类别。 */
+val MutedTeal = Color(0xFF0D9488)
 
-/** 暖玫褐：购物、娱乐等辅助类别。 */
-val MutedRose = Color(0xFFC4677F)
+/** 洋红：购物、娱乐等辅助类别。 */
+val MutedRose = Color(0xFFC026D3)

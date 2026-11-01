@@ -1,6 +1,7 @@
 package com.example.xiancli_tools.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
@@ -19,6 +20,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.annotation.DrawableRes
+import com.example.xiancli_tools.ui.theme.Dimens
+
+/** 卡片细描边：亮色下是若有若无的一圈，暗色下让卡片从纸底里「浮」出来。 */
+private val CardBorderWidth = 1.dp
 
 /**
  * 页面主内容卡片：白卡浮在暖白纸底上。
@@ -31,14 +36,20 @@ fun SectionCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(Dimens.CornerL),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                width = CardBorderWidth,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(Dimens.CornerL)
+            )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Dimens.SpaceL)) {
             if (title != null) {
                 Text(
                     text = title,
@@ -68,7 +79,7 @@ fun MetricTile(
     val alignment = if (centered) Alignment.CenterHorizontally else Alignment.Start
     Column(
         modifier = modifier
-            .background(container, RoundedCornerShape(14.dp))
+            .background(container, RoundedCornerShape(Dimens.CornerM))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalAlignment = alignment
     ) {
@@ -96,7 +107,7 @@ fun EmptyReportCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(Dimens.CornerL),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),

@@ -3,6 +3,8 @@ package com.example.xiancli_tools.ui
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,6 +66,7 @@ import com.example.xiancli_tools.data.lan.LanDiscovery
 import com.example.xiancli_tools.ui.components.IconBadge
 import com.example.xiancli_tools.ui.theme.BrandDawn
 import com.example.xiancli_tools.ui.theme.BrandDusk
+import com.example.xiancli_tools.ui.theme.Dimens
 import com.example.xiancli_tools.ui.theme.DrinkAccent
 import com.example.xiancli_tools.ui.theme.LedgerAccent
 import com.example.xiancli_tools.ui.theme.MijiaAccent
@@ -157,10 +160,10 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp)
+                .padding(horizontal = Dimens.SpaceL)
+                .padding(bottom = Dimens.SpaceXL)
         ) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.SpaceM))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -285,7 +288,7 @@ fun HomeScreen(
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.SpaceM))
             TodayOverviewCard(
                 expenseCents = todayExpense,
                 focusMillis = todayFocus,
@@ -294,7 +297,7 @@ fun HomeScreen(
                 drinkCount = todayDrinks,
                 onClick = onOpenReview
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(Dimens.SpaceM))
             ToolCard(
                 title = "计时",
                 subtitle = "10 / 25 / 50 分钟，也可自定义",
@@ -302,7 +305,7 @@ fun HomeScreen(
                 accent = TimerAccent,
                 onClick = onOpenTimer
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(Dimens.SpaceM))
             ToolCard(
                 title = "备忘",
                 subtitle = "随手记，到点提醒，待办能勾掉",
@@ -310,7 +313,7 @@ fun HomeScreen(
                 accent = NoteAccent,
                 onClick = onOpenNote
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(Dimens.SpaceM))
             ToolCard(
                 title = "账本",
                 subtitle = "快速记账，区间支出报告",
@@ -318,7 +321,7 @@ fun HomeScreen(
                 accent = LedgerAccent,
                 onClick = onOpenLedger
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(Dimens.SpaceM))
             ToolCard(
                 title = "足迹",
                 subtitle = "步行 · 骑车 · 开车轨迹地图",
@@ -326,7 +329,7 @@ fun HomeScreen(
                 accent = TrackAccent,
                 onClick = onOpenTrack
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(Dimens.SpaceM))
             ToolCard(
                 title = "饮记",
                 subtitle = "喝一次点一下，看每天的各类次数",
@@ -334,7 +337,7 @@ fun HomeScreen(
                 accent = DrinkAccent,
                 onClick = onOpenDrink
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(Dimens.SpaceM))
             ToolCard(
                 title = "米家",
                 subtitle = "开关灯、调亮度、一键全关",
@@ -418,7 +421,7 @@ private fun NearbyPeersMenu(
     }
 }
 
-/** 首页顶部的「今天」：五个最常看的数，点一下进回顾页看全貌。 */
+/** 首页「今天」：五个最常看的数，点一下进回顾页看全貌。 */
 @Composable
 private fun TodayOverviewCard(
     expenseCents: Long,
@@ -429,16 +432,21 @@ private fun TodayOverviewCard(
     onClick: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(Dimens.CornerL),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(Dimens.CornerL)
+            )
             .clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Dimens.SpaceL)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "今天",
@@ -458,12 +466,12 @@ private fun TodayOverviewCard(
                     modifier = Modifier.size(16.dp)
                 )
             }
-            Spacer(Modifier.height(12.dp))
-            // 五格一行：一列约 54dp，值都按最紧凑的写法给（分 / 公里 / 次 / 条），
-            // 免得「1小时30分」「3.42 公里」这种长串在窄列里折行。
+            Spacer(Modifier.height(Dimens.SpaceM))
+            // 五格一行：每格垫一层工具色的淡底，一眼把数字和对应工具对上；
+            // 值都按最紧凑的写法给（分 / 公里 / 次 / 条），免得长串在窄列里折行。
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceS)
             ) {
                 OverviewCell(
                     modifier = Modifier.weight(1f),
@@ -525,17 +533,21 @@ private fun OverviewCell(
     accent: Color,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier
+            .background(accent.copy(alpha = 0.14f), RoundedCornerShape(Dimens.CornerS))
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+    ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
         )
         Spacer(Modifier.height(2.dp))
         Text(
             text = value,
-            style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp, lineHeight = 17.sp),
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, lineHeight = 18.sp),
             fontWeight = FontWeight.Bold,
             color = accent,
             maxLines = 1
@@ -543,6 +555,10 @@ private fun OverviewCell(
     }
 }
 
+/**
+ * 工具卡：单列通栏，横排布局（徽章在左、名称与说明在右、箭头收尾）。
+ * 徽章用工具色 18% 淡底的圆角方块，一卡一色。
+ */
 @Composable
 private fun ToolCard(
     title: String,
@@ -552,26 +568,31 @@ private fun ToolCard(
     onClick: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(Dimens.CornerL),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(Dimens.CornerL)
+            )
             .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(Dimens.SpaceL),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceM)
         ) {
             IconBadge(
                 icon = icon,
                 tint = accent,
-                container = accent.copy(alpha = 0.14f),
+                container = accent.copy(alpha = 0.18f),
                 size = 56.dp,
                 iconSize = 28.dp
             )
@@ -581,7 +602,7 @@ private fun ToolCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(Dimens.SpaceXS))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,

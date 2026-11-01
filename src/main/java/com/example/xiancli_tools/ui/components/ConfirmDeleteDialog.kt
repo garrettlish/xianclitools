@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.font.FontWeight
 
 /** 删除前的二次确认框：只有点「删除」才会真正执行删除。 */
 @Composable
@@ -18,16 +19,22 @@ fun ConfirmDeleteDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(message) },
+        title = { Text(title, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Text(
+                message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(confirmLabel, color = MaterialTheme.colorScheme.error)
+                Text(confirmLabel, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(dismissLabel)
+                Text(dismissLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
