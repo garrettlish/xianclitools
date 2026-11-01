@@ -60,7 +60,6 @@ import com.example.xiancli_tools.data.LedgerRepository
 import com.example.xiancli_tools.data.NoteCategory
 import com.example.xiancli_tools.data.NoteRepository
 import com.example.xiancli_tools.data.ReviewAnalytics
-import com.example.xiancli_tools.data.TimerSessionRepository
 import com.example.xiancli_tools.data.TrackRepository
 import com.example.xiancli_tools.data.lan.LanDiscovery
 import com.example.xiancli_tools.ui.components.IconBadge
@@ -100,7 +99,6 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var todayExpense by remember { mutableLongStateOf(0L) }
-    var todayFocus by remember { mutableLongStateOf(0L) }
     var pendingTodos by remember { mutableIntStateOf(0) }
     var todayDistance by remember { mutableDoubleStateOf(0.0) }
     var todayDrinks by remember { mutableIntStateOf(0) }
@@ -141,9 +139,6 @@ fun HomeScreen(
             todayExpense = LedgerRepository(context).loadRecords()
                 .filter { it.timeMillis in range.startMillis until range.endMillis }
                 .sumOf { it.amountCents }
-            todayFocus = TimerSessionRepository(context).loadSessions()
-                .filter { it.startMillis in range.startMillis until range.endMillis }
-                .sumOf { it.focusMillis }
             pendingTodos = NoteRepository(context).loadNotes()
                 .count { it.category == NoteCategory.TODO && !it.done }
             todayDistance = TrackRepository(context).loadSessionIndex()
@@ -291,7 +286,6 @@ fun HomeScreen(
             Spacer(Modifier.height(Dimens.SpaceM))
             TodayOverviewCard(
                 expenseCents = todayExpense,
-                focusMillis = todayFocus,
                 pendingTodos = pendingTodos,
                 distanceMeters = todayDistance,
                 drinkCount = todayDrinks,
@@ -421,11 +415,10 @@ private fun NearbyPeersMenu(
     }
 }
 
-/** 首页「今天」：五个最常看的数，点一下进回顾页看全貌。 */
+/** 首页「今天」：四个最常看的数，点一下进回顾页看全貌。 */
 @Composable
 private fun TodayOverviewCard(
     expenseCents: Long,
-    focusMillis: Long,
     pendingTodos: Int,
     distanceMeters: Double,
     drinkCount: Int,
@@ -467,7 +460,7 @@ private fun TodayOverviewCard(
                 )
             }
             Spacer(Modifier.height(Dimens.SpaceM))
-            // 五格一行：每格垫一层工具色的淡底，一眼把数字和对应工具对上；
+            // 四格一行：每格垫一层工具色的淡底，一眼把数字和对应工具对上；
             // 值都按最紧凑的写法给（分 / 公里 / 次 / 条），免得长串在窄列里折行。
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -478,12 +471,6 @@ private fun TodayOverviewCard(
                     label = "支出",
                     value = compactMoney(expenseCents),
                     accent = LedgerAccent
-                )
-                OverviewCell(
-                    modifier = Modifier.weight(1f),
-                    label = "专注",
-                    value = compactFocus(focusMillis),
-                    accent = TimerAccent
                 )
                 OverviewCell(
                     modifier = Modifier.weight(1f),
@@ -515,9 +502,6 @@ private fun compactMoney(cents: Long): String =
     } else {
         ReviewAnalytics.formatMoney(cents)
     }
-
-/** 专注只报分钟数：「180分」比「3小时0分」省一半宽度。 */
-private fun compactFocus(millis: Long): String = "${(millis / 60_000L).coerceAtLeast(0L)} 分"
 
 /** 里程一位小数就够，`formatDistance` 的两位在这里会折行。 */
 private fun compactDistance(meters: Double): String = when {
@@ -585,7 +569,7 @@ private fun ToolCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Dimens.SpaceL),
+                .padding(horizontal = Dimens.SpaceL, vertical = Dimens.SpaceM),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceM)
         ) {
@@ -593,8 +577,8 @@ private fun ToolCard(
                 icon = icon,
                 tint = accent,
                 container = accent.copy(alpha = 0.18f),
-                size = 56.dp,
-                iconSize = 28.dp
+                size = 48.dp,
+                iconSize = 24.dp
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
